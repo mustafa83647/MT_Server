@@ -1,24 +1,23 @@
 #!/bin/bash
-# مسار الحفظ الدائم
+# مسار الحفظ الدائم (البوكت)
 DATA_DIR="/data/minecraft_data"
-mkdir -p $DATA_DIR/world
-mkdir -p $DATA_DIR/config
-mkdir -p $DATA_DIR/mods
+mkdir -p $DATA_DIR/world $DATA_DIR/config $DATA_DIR/mods $DATA_DIR/logs $DATA_DIR/crash-reports
 chmod -R 777 /data
-# مسار السيرفر المؤقت
+# مسار السيرفر المؤقت (الذاكرة السريعة)
 SERVER_DIR="/app/minecraft"
 mkdir -p $SERVER_DIR
 cd $SERVER_DIR
-# ربط كل الملفات المهمة بالحفظ الدائم (حتى ما يضيع أي شي)
-rm -rf ./world ./config ./mods ./server.properties ./ops.json ./banned-players.json ./whitelist.json
-ln -s $DATA_DIR/world ./world
-ln -s $DATA_DIR/config ./config
-ln -s $DATA_DIR/mods ./mods
-touch $DATA_DIR/server.properties $DATA_DIR/ops.json $DATA_DIR/banned-players.json $DATA_DIR/whitelist.json
-ln -s $DATA_DIR/server.properties ./server.properties
-ln -s $DATA_DIR/ops.json ./ops.json
-ln -s $DATA_DIR/banned-players.json ./banned-players.json
-ln -s $DATA_DIR/whitelist.json ./whitelist.json
+# 1. ربط المجلدات بالبوكت
+for dir in world config mods logs crash-reports; do
+    rm -rf ./$dir
+    ln -s $DATA_DIR/$dir ./$dir
+done
+# 2. ربط الملفات المهمة بالبوكت (إنشائها إذا ما موجودة ثم ربطها)
+for file in server.properties ops.json banned-players.json banned-ips.json whitelist.json usercache.json; do
+    touch $DATA_DIR/$file
+    rm -f ./$file
+    ln -s $DATA_DIR/$file ./$file
+done
 # إعدادات أساسية
 echo "eula=true" > eula.txt
 if ! grep -q "online-mode" server.properties; then
