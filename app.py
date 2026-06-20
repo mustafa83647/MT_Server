@@ -31,11 +31,11 @@ ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 def setup_environment():
     global server_logs
     server_logs.append("[النظام] 🛠️ جاري تهيئة بيئة السيرفر وربط الملفات بالبوكت...")
+
     dirs_to_link = ['world', 'config', 'mods', 'logs', 'crash-reports']
     for d in dirs_to_link: os.makedirs(os.path.join(DATA_DIR, d), exist_ok=True)
     os.makedirs(os.path.join(DATA_DIR, "backups"), exist_ok=True)
     os.makedirs(APP_DIR, exist_ok=True)
-
     files_to_link = ['server.properties', 'ops.json', 'banned-players.json', 'banned-ips.json', 'whitelist.json', 'usercache.json']
     for f in files_to_link:
         file_path = os.path.join(DATA_DIR, f)
@@ -43,9 +43,7 @@ def setup_environment():
             with open(file_path, 'w') as file:
                 if f == 'server.properties': file.write("online-mode=false\n")
                 elif f.endswith('.json'): file.write("[]\n")
-
     with open(os.path.join(APP_DIR, "eula.txt"), 'w') as f: f.write("eula=true\n")
-
     for item in dirs_to_link + files_to_link:
         src = os.path.join(DATA_DIR, item)
         dst = os.path.join(APP_DIR, item)
@@ -53,7 +51,6 @@ def setup_environment():
             if os.path.isdir(dst) and not os.path.islink(dst): shutil.rmtree(dst)
             else: os.remove(dst)
         os.symlink(src, dst)
-
     fabric_jar = os.path.join(APP_DIR, "fabric-server-launch.jar")
     if not os.path.exists(fabric_jar):
         server_logs.append("[النظام] ⬇️ جاري تحميل وتثبيت محرك Fabric (1.20.4)...")
@@ -61,6 +58,7 @@ def setup_environment():
         os.system(f"wget -q -O {installer_path} https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.jar")
         os.system(f"cd {APP_DIR} && java -jar fabric-installer.jar server -mcversion 1.20.4 -loader 0.15.7 -downloadMinecraft")
         if os.path.exists(installer_path): os.remove(installer_path)
+
     server_logs.append("[النظام] ✅ تمت التهيئة بنجاح!")
 # ==========================================
 # 2. نظام إدارة العمليات (Playit & Minecraft)
@@ -69,45 +67,60 @@ def start_playit():
     global playit_process, network_info, server_logs
 
     secret = os.environ.get("PLAYIT_SECRET")
-    # سحب الآي بي الثابت من الإعدادات لعرضه باللوحة
-    static_ip = os.environ.get("PLAYIT_IP", "شغال (انسخ الآي بي من موقع Playit)")
+    static_ip = os.environ.get("PLAYIT_IP", "catalog-ports.gl.joinmc.link") # الآي بي مالتك من الصورة
+
     if not secret:
         network_info["status"] = "error"
         network_info["ip"] = "يرجى إضافة PLAYIT_SECRET"
-        server_logs.append("[الشبكة] ❌ خطأ: لم يتم العثور على PLAYIT_SECRET!")
+        server_logs.append("[الشبكة] ❌ خطأ: لم يتم العثور على PLAYIT_SECRET في إعدادات السبيس!")
         return
     env = os.environ.copy()
     env["HOME"] = DATA_DIR
-    # تشغيل الأداة بصمت تام (DEVNULL) لمنع تعليق البايثون
+    server_logs.append("[الشبكة] 🔄 جاري الاتصال بخوادم Playit...")
+
+    # تشغيل Playit مع السماح بقراءة مخرجاته لمعرفة الأخطاء
     playit_process = subprocess.Popen(
         ["playit", "--secret", secret],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
         stdin=subprocess.DEVNULL,
+        text=True,
+        bufsize=1,
         env=env
     )
     network_info["status"] = "connected"
     network_info["ip"] = static_ip
-    server_logs.append("[الشبكة] 🟢 تم ربط Playit بنجاح بالخلفية.")
+    for line in playit_process.stdout:
+        clean_line = ansi_escape.sub('', line.strip())
+        # طباعة رسائل Playit المهمة في الكونسول حتى نشوفها
+        if "error" in clean_line.lower() or "failed" in clean_line.lower():
+            server_logs.append(f"[Playit] ⚠️ {clean_line}")
+        elif "tunnel" in clean_line.lower() or "connected" in clean_line.lower():
+            server_logs.append(f"[Playit] 🌐 {clean_line}")
 def start_minecraft():
     global mc_process, server_logs, online_players
     if mc_process and mc_process.poll() is None: return
+
     setup_environment()
     online_players.clear()
     server_logs.append("[النظام] 🚀 جاري إطلاق سيرفر ماين كرافت...")
+
+    # تم تقليل الرام إلى 6 جيجا لضمان عدم قيام النظام بقتل العملية
     mc_process = subprocess.Popen(
-        ["java", "-Xms2G", "-Xmx10G", "-jar", "fabric-server-launch.jar", "nogui"],
+        ["java", "-Xms2G", "-Xmx6G", "-jar", "fabric-server-launch.jar", "nogui"],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE, text=True, cwd=APP_DIR
     )
+
     for line in mc_process.stdout:
         clean_line = ansi_escape.sub('', line.strip())
         server_logs.append(clean_line)
         if len(server_logs) > 300: server_logs.pop(0)
+
         join_match = re.search(r': ([a-zA-Z0-9_]+) joined the game', clean_line)
         if join_match: online_players.add(join_match.group(1))
+
         leave_match = re.search(r': ([a-zA-Z0-9_]+) left the game', clean_line)
         if leave_match and leave_match.group(1) in online_players: online_players.remove(leave_match.group(1))
-
     server_logs.append("[النظام] 🛑 توقف سيرفر ماين كرافت.")
     online_players.clear()
 threading.Thread(target=start_playit, daemon=True).start()
@@ -277,8 +290,6 @@ DASHBOARD_HTML = """
         .ip-badge { font-weight: bold; font-size: 18px; letter-spacing: 1px; }
         .ip-connected { color: #34d399; }
         .ip-error { color: #ef4444; }
-        .ip-loading { color: #94a3b8; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
         .btn-copy { background: #334155; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; transition: 0.3s; font-size: 14px; }
         .btn-copy:hover { background: #475569; }
         .btn-logout { background: #ef4444; color: white; padding: 10px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; transition: 0.3s; }
@@ -358,7 +369,6 @@ DASHBOARD_HTML = """
             <button class="tab-btn" onclick="openTab('settings'); loadConfig();">إعدادات السيرفر</button>
             <button class="tab-btn" onclick="openTab('crashes'); loadCrash();">الكراشات</button>
         </div>
-
         <!-- 1. Console Tab -->
         <div id="console" class="tab-content active">
             <div class="action-bar">
@@ -374,13 +384,11 @@ DASHBOARD_HTML = """
                 </div>
             </div>
         </div>
-
         <!-- 2. Players Tab -->
         <div id="players" class="tab-content">
             <h3 style="margin-top:0; color:#38bdf8;">👥 اللاعبين المتصلين حالياً</h3>
             <div id="players-list"><p style="color: #94a3b8;">جاري التحميل...</p></div>
         </div>
-
         <!-- 3. Mods Tab -->
         <div id="mods" class="tab-content">
             <h3 style="margin-top:0; color:#38bdf8;">📦 إدارة المودات (Mods)</h3>
@@ -390,7 +398,6 @@ DASHBOARD_HTML = """
             </div>
             <div id="mods-list" style="margin-top: 20px;">جاري التحميل...</div>
         </div>
-
         <!-- 4. Backups Tab -->
         <div id="backups" class="tab-content">
             <h3 style="margin-top:0; color:#38bdf8;">💾 النسخ الاحتياطي للعالم (World)</h3>
@@ -399,7 +406,6 @@ DASHBOARD_HTML = """
             </button>
             <div id="backups-list">جاري التحميل...</div>
         </div>
-
         <!-- 5. Settings Tab -->
         <div id="settings" class="tab-content">
             <h3 style="margin-top:0; color:#38bdf8;">⚙️ إعدادات السيرفر (server.properties)</h3>
@@ -409,7 +415,6 @@ DASHBOARD_HTML = """
                 💾 حفظ الإعدادات
             </button>
         </div>
-
         <!-- 6. Crashes Tab -->
         <div id="crashes" class="tab-content">
             <h3 style="margin-top:0; color:#ef4444;">⚠️ آخر تقرير كراش (Crash Report)</h3>
@@ -456,6 +461,7 @@ DASHBOARD_HTML = """
                 statusEl.innerText = data.status;
                 statusEl.className = data.status.includes('شغال') ? 'stat-value status-online' : 'stat-value status-offline';
                 document.getElementById('players-count').innerText = data.players.length;
+
                 let netArea = document.getElementById('network-area');
                 if (data.network.status === 'error') {
                     netArea.innerHTML = `<span class="ip-badge ip-error" id="ip-display">${data.network.ip}</span>`;
@@ -467,8 +473,10 @@ DASHBOARD_HTML = """
                 } else {
                     netArea.innerHTML = `<span class="ip-badge ip-loading" id="ip-display">${data.network.ip}</span>`;
                 }
+
                 consoleBox.innerHTML = data.logs.join('<br>');
                 if (autoScroll) consoleBox.scrollTop = consoleBox.scrollHeight;
+
                 let p_html = data.players.length === 0 ? '<p style="color: #94a3b8;">لا يوجد لاعبين متصلين حالياً.</p>' : '';
                 data.players.forEach(p => {
                     p_html += `
