@@ -130,7 +130,7 @@ def start_minecraft():
     java_args = [
         "java",
         "-Xms2G",
-        "-Xmx6G",
+        "-Xmx10G",
         f"-Dfabric.modsDir={mods_dir}",
         f"-Dfabric.configDir={config_dir}",
         "-XX:+UseG1GC",
