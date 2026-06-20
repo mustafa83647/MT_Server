@@ -20,7 +20,7 @@ APP_DIR = "/app/minecraft"
 # متغيرات التحكم (Thread-Safe)
 mc_process = None
 playit_process = None
-server_logs = deque(maxlen=500) # يحفظ آخر 500 سطر فقط لمنع استهلاك الرام
+server_logs = deque(maxlen=500)
 online_players = set()
 network_info = {
     "status": "loading",
@@ -44,15 +44,16 @@ def force_symlink(src, dst):
 def setup_environment():
     """تهيئة بيئة السيرفر بالكامل"""
     server_logs.append("[النظام] 🛠️ جاري تهيئة بيئة السيرفر (Enterprise Mode)...")
-
     # إنشاء المجلدات الأساسية في البوكت
-    dirs_to_link = ['world', 'config', 'mods', 'logs', 'crash-reports']
-    for d in dirs_to_link:
-        os.makedirs(os.path.join(DATA_DIR, d), exist_ok=True)
-
+    os.makedirs(os.path.join(DATA_DIR, "world"), exist_ok=True)
+    os.makedirs(os.path.join(DATA_DIR, "mods"), exist_ok=True)
+    os.makedirs(os.path.join(DATA_DIR, "config"), exist_ok=True)
     os.makedirs(os.path.join(DATA_DIR, "backups"), exist_ok=True)
+
     os.makedirs(APP_DIR, exist_ok=True)
-    # إنشاء الملفات الأساسية إذا لم تكن موجودة
+    # ربط مجلد العالم فقط (لأن ماين كرافت تتعامل معه بدون مشاكل)
+    force_symlink(os.path.join(DATA_DIR, "world"), os.path.join(APP_DIR, "world"))
+    # إنشاء وربط الملفات الأساسية
     files_to_link = ['server.properties', 'ops.json', 'banned-players.json', 'banned-ips.json', 'whitelist.json', 'usercache.json']
     for f in files_to_link:
         file_path = os.path.join(DATA_DIR, f)
@@ -62,12 +63,10 @@ def setup_environment():
                     file.write("online-mode=false\n")
                 elif f.endswith('.json'):
                     file.write("[]\n")
+        force_symlink(file_path, os.path.join(APP_DIR, f))
     # الموافقة على شروط اللعبة
     with open(os.path.join(APP_DIR, "eula.txt"), 'w') as f:
         f.write("eula=true\n")
-    # تنفيذ الربط الذكي
-    for item in dirs_to_link + files_to_link:
-        force_symlink(os.path.join(DATA_DIR, item), os.path.join(APP_DIR, item))
     # تحميل محرك Fabric إذا لم يكن موجوداً
     fabric_jar = os.path.join(APP_DIR, "fabric-server-launch.jar")
     if not os.path.exists(fabric_jar):
@@ -77,7 +76,6 @@ def setup_environment():
         subprocess.run(["java", "-jar", "fabric-installer.jar", "server", "-mcversion", "1.20.4", "-loader", "0.15.7", "-downloadMinecraft"], cwd=APP_DIR)
         if os.path.exists(installer_path):
             os.remove(installer_path)
-
     server_logs.append("[النظام] ✅ تمت التهيئة بنجاح. البيئة جاهزة.")
 # ==========================================
 # 3. إدارة العمليات (Playit & Minecraft)
@@ -85,23 +83,18 @@ def setup_environment():
 def start_playit():
     """تشغيل Playit مع مراقبة دقيقة جداً للمخرجات"""
     global playit_process, network_info
-
     secret = os.environ.get("PLAYIT_SECRET")
     static_ip = os.environ.get("PLAYIT_IP", "الآي بي الثابت (انسخه من موقع Playit)")
-
     if not secret:
         network_info["status"] = "error"
         network_info["ip"] = "مفقود PLAYIT_SECRET"
         server_logs.append("[Playit] ❌ خطأ قاتل: لم يتم العثور على PLAYIT_SECRET في إعدادات السبيس!")
         return
-    # تنظيف الـ Secret من أي مسافات مخفية
-    secret = secret.strip()
 
+    secret = secret.strip()
     env = os.environ.copy()
     env["HOME"] = DATA_DIR
-
     server_logs.append("[Playit] 🔄 جاري بدء الاتصال بخوادم Playit العالمية...")
-
     try:
         playit_process = subprocess.Popen(
             ["playit", "--secret", secret],
@@ -112,39 +105,34 @@ def start_playit():
             bufsize=1,
             env=env
         )
-
         network_info["status"] = "connected"
         network_info["ip"] = static_ip
-
-        # قراءة مخرجات Playit سطر بسطر وعرضها بالكونسول
         for line in playit_process.stdout:
             clean_line = ansi_escape.sub('', line.strip())
             if not clean_line: continue
-
-            # فلترة الرسائل المزعجة وعرض المهم فقط
             if "error" in clean_line.lower() or "invalid" in clean_line.lower() or "fail" in clean_line.lower():
                 server_logs.append(f"[Playit] ❌ {clean_line}")
-            elif "tunnel" in clean_line.lower() or "registered" in clean_line.lower():
+            elif "tunnel" in clean_line.lower() or "registered" in clean_line.lower() or "connected" in clean_line.lower():
                 server_logs.append(f"[Playit] 🌐 {clean_line}")
-            elif "secret" in clean_line.lower():
-                server_logs.append(f"[Playit] 🔑 {clean_line}")
-
     except Exception as e:
         server_logs.append(f"[Playit] ❌ انهيار في أداة الشبكة: {e}")
 def start_minecraft():
-    """تشغيل ماين كرافت مع أكواد Aikar's Flags للأداء الخارق"""
+    """تشغيل ماين كرافت مع حل مشكلة المودات وأكواد الأداء"""
     global mc_process, online_players
-
     if mc_process and mc_process.poll() is None:
         return
+
     setup_environment()
     online_players.clear()
-
-    # أكواد Aikar's Flags (تمنع اللاك وتدير الرام بعبقرية)
+    # الحل السحري: توجيه Fabric مباشرة للبوكت بدون اختصارات
+    mods_dir = os.path.join(DATA_DIR, "mods")
+    config_dir = os.path.join(DATA_DIR, "config")
     java_args = [
         "java",
         "-Xms2G",
-        "-Xmx6G", # 6 جيجا رام آمنة جداً لهيجين فيس
+        "-Xmx6G",
+        f"-Dfabric.modsDir={mods_dir}",
+        f"-Dfabric.configDir={config_dir}",
         "-XX:+UseG1GC",
         "-XX:+ParallelRefProcEnabled",
         "-XX:MaxGCPauseMillis=200",
@@ -167,7 +155,6 @@ def start_minecraft():
         "nogui"
     ]
     server_logs.append("[Minecraft] 🚀 جاري إطلاق السيرفر مع تحسينات الأداء (Aikar's Flags)...")
-
     try:
         mc_process = subprocess.Popen(
             java_args,
@@ -181,12 +168,12 @@ def start_minecraft():
         for line in mc_process.stdout:
             clean_line = ansi_escape.sub('', line.strip())
             if not clean_line: continue
-
             server_logs.append(clean_line)
-            # صيد اللاعبين
+
             join_match = re.search(r': ([a-zA-Z0-9_]+) joined the game', clean_line)
             if join_match:
                 online_players.add(join_match.group(1))
+
             leave_match = re.search(r': ([a-zA-Z0-9_]+) left the game', clean_line)
             if leave_match and leave_match.group(1) in online_players:
                 online_players.remove(leave_match.group(1))
@@ -195,7 +182,6 @@ def start_minecraft():
         server_logs.append(f"[Minecraft] ❌ فشل في تشغيل الجافا: {e}")
     finally:
         online_players.clear()
-# بدء العمليات في الخلفية
 threading.Thread(target=start_playit, daemon=True).start()
 threading.Thread(target=start_minecraft, daemon=True).start()
 # ==========================================
@@ -302,43 +288,40 @@ def handle_config():
                     k, v = line.split('=', 1)
                     props[k.strip()] = v.strip()
     return jsonify(props)
-# --- نظام مدير الملفات الجديد (File Manager) ---
 @app.route('/api/files', methods=['GET', 'POST'])
 def file_manager():
     if not session.get('logged_in'): return "Unauthorized", 401
-
     if request.method == 'POST':
         action = request.form.get('action')
         target = request.form.get('target')
         target_path = os.path.join(DATA_DIR, target)
-
-        # حماية من الخروج عن مسار البوكت
-        if not os.path.abspath(target_path).startswith(DATA_DIR):
-            return "Access Denied", 403
-
+        if not os.path.abspath(target_path).startswith(DATA_DIR): return "Access Denied", 403
         if action == 'delete':
             try:
                 if os.path.isfile(target_path): os.remove(target_path)
                 elif os.path.isdir(target_path): shutil.rmtree(target_path)
                 return "Deleted"
             except Exception as e: return str(e), 500
-
         elif action == 'read':
             try:
-                with open(target_path, 'r', encoding='utf-8') as f:
-                    return f.read()
+                with open(target_path, 'r', encoding='utf-8') as f: return f.read()
             except Exception as e: return str(e), 500
-
-    # جلب قائمة الملفات
     file_list = []
     for root, dirs, files in os.walk(DATA_DIR):
-        # إخفاء مجلد العالم لتجنب العبث به
         if 'world' in root or 'backups' in root: continue
         for file in files:
             if file.endswith(('.json', '.properties', '.txt', '.log')):
                 rel_path = os.path.relpath(os.path.join(root, file), DATA_DIR)
                 file_list.append(rel_path)
     return jsonify(file_list)
+@app.route('/api/crash')
+def get_crash():
+    if not session.get('logged_in'): return "Unauthorized", 401
+    crash_dir = os.path.join(APP_DIR, "crash-reports")
+    if not os.path.exists(crash_dir): return "لا توجد كراشات."
+    crashes = sorted([f for f in os.listdir(crash_dir) if f.endswith('.txt')], reverse=True)
+    if not crashes: return "السيرفر مستقر، لا توجد تقارير كراش."
+    with open(os.path.join(crash_dir, crashes[0]), 'r') as f: return f.read()
 # ==========================================
 # 5. واجهات المستخدم (HTML/CSS/JS)
 # ==========================================
@@ -382,14 +365,10 @@ DASHBOARD_HTML = """
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; }
-
-        /* Toast Notifications */
         #toast-container { position: fixed; bottom: 20px; left: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
         .toast { background: #1e293b; color: white; padding: 15px 25px; border-radius: 8px; border-right: 4px solid #38bdf8; box-shadow: 0 4px 15px rgba(0,0,0,0.3); animation: slideIn 0.3s ease-out forwards; font-weight: bold; }
         @keyframes slideIn { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
-
-        /* Header */
         .header { display: flex; justify-content: space-between; align-items: center; background: linear-gradient(145deg, #1e293b, #0f172a); padding: 20px; border-radius: 16px; border: 1px solid #334155; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
         .header h2 { margin: 0; color: #38bdf8; display: flex; align-items: center; gap: 10px; text-shadow: 0 2px 10px rgba(56, 189, 248, 0.2); }
         .network-box { display: flex; align-items: center; gap: 10px; background: rgba(15, 23, 42, 0.6); padding: 8px 15px; border-radius: 10px; border: 1px solid #334155; }
@@ -400,8 +379,6 @@ DASHBOARD_HTML = """
         .btn-copy:hover { background: #475569; }
         .btn-logout { background: #ef4444; color: white; padding: 10px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; transition: 0.3s; }
         .btn-logout:hover { background: #dc2626; }
-
-        /* Stats Grid */
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
         .stat-card { background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; text-align: center; transition: transform 0.3s; }
         .stat-card:hover { transform: translateY(-5px); }
@@ -409,8 +386,6 @@ DASHBOARD_HTML = """
         .stat-value { font-size: 26px; font-weight: bold; color: #f8fafc; }
         .status-online { color: #34d399; text-shadow: 0 0 10px rgba(52, 211, 153, 0.3); }
         .status-offline { color: #ef4444; }
-
-        /* Tabs */
         .tabs-nav { display: flex; gap: 10px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px; }
         .tab-btn { background: #1e293b; color: #94a3b8; border: 1px solid #334155; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap; transition: 0.3s; }
         .tab-btn:hover { background: #334155; color: white; }
@@ -418,37 +393,26 @@ DASHBOARD_HTML = """
         .tab-content { display: none; background: #1e293b; padding: 25px; border-radius: 12px; border: 1px solid #334155; animation: fadeIn 0.3s; }
         .tab-content.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* Console */
         .console-wrapper { background: #020617; border-radius: 8px; border: 1px solid #334155; overflow: hidden; }
         .console-output { padding: 15px; height: 50vh; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 14px; color: #a3e635; direction: ltr; text-align: left; line-height: 1.5; }
         .console-input-area { display: flex; border-top: 1px solid #334155; }
         .console-input { flex: 1; background: transparent; border: none; padding: 15px; color: white; font-family: monospace; font-size: 15px; outline: none; }
         .console-btn { background: #0ea5e9; color: white; border: none; padding: 0 25px; cursor: pointer; font-weight: bold; transition: 0.3s; }
         .console-btn:hover { background: #0284c7; }
-
-        /* Buttons & Forms */
         .action-bar { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
         .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: white; transition: 0.3s; display: inline-flex; align-items: center; gap: 8px; }
         .btn-green { background: #10b981; } .btn-green:hover { background: #059669; }
         .btn-red { background: #ef4444; } .btn-red:hover { background: #dc2626; }
         .btn-blue { background: #3b82f6; } .btn-blue:hover { background: #2563eb; }
         .btn-orange { background: #f59e0b; } .btn-orange:hover { background: #d97706; }
-
-        /* Lists */
         .list-item { display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #334155; transition: 0.2s; }
         .list-item:hover { border-color: #475569; }
         .list-item-title { font-weight: bold; font-size: 16px; }
         .list-actions { display: flex; gap: 8px; }
-
-        /* Config Form */
         .config-row { display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #334155; }
         .config-row select, .config-row input { background: #1e293b; color: white; border: 1px solid #475569; padding: 8px 12px; border-radius: 6px; outline: none; font-weight: bold; }
         .config-row input:focus, .config-row select:focus { border-color: #38bdf8; }
-
-        /* File Manager */
         .file-viewer { background: #020617; color: #e2e8f0; padding: 15px; border-radius: 8px; font-family: monospace; white-space: pre-wrap; max-height: 400px; overflow-y: auto; direction: ltr; text-align: left; border: 1px solid #334155; margin-top: 15px; display: none;}
-
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
@@ -466,7 +430,6 @@ DASHBOARD_HTML = """
             </div>
             <a href="/logout" class="btn-logout">تسجيل خروج</a>
         </div>
-
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-title">حالة السيرفر</div>
@@ -485,7 +448,6 @@ DASHBOARD_HTML = """
                 <div class="stat-value" id="players-count">0</div>
             </div>
         </div>
-
         <div class="tabs-nav">
             <button class="tab-btn active" onclick="openTab('console')">الكونسول والتحكم</button>
             <button class="tab-btn" onclick="openTab('players')">إدارة اللاعبين</button>
@@ -493,6 +455,7 @@ DASHBOARD_HTML = """
             <button class="tab-btn" onclick="openTab('files'); loadFiles();">مدير الملفات</button>
             <button class="tab-btn" onclick="openTab('backups'); loadBackups();">النسخ الاحتياطي</button>
             <button class="tab-btn" onclick="openTab('settings'); loadConfig();">إعدادات السيرفر</button>
+            <button class="tab-btn" onclick="openTab('crashes'); loadCrash();">الكراشات</button>
         </div>
         <!-- 1. Console Tab -->
         <div id="console" class="tab-content active">
@@ -523,7 +486,6 @@ DASHBOARD_HTML = """
             </div>
             <div id="mods-list" style="margin-top: 20px;">جاري التحميل...</div>
         </div>
-
         <!-- 4. File Manager Tab -->
         <div id="files" class="tab-content">
             <h3 style="margin-top:0; color:#38bdf8;">📁 مدير ملفات السيرفر (JSON & Logs)</h3>
@@ -547,6 +509,13 @@ DASHBOARD_HTML = """
             <button class="btn btn-green" onclick="saveConfig()" style="width: 100%; justify-content: center; padding: 15px; font-size: 16px; margin-top: 20px;">
                 💾 حفظ الإعدادات
             </button>
+        </div>
+        <!-- 7. Crashes Tab -->
+        <div id="crashes" class="tab-content">
+            <h3 style="margin-top:0; color:#ef4444;">⚠️ آخر تقرير كراش (Crash Report)</h3>
+            <div class="console-wrapper">
+                <div class="console-output" id="crash-box" style="color: #fca5a5;">جاري التحميل...</div>
+            </div>
         </div>
     </div>
     <script>
@@ -583,22 +552,16 @@ DASHBOARD_HTML = """
             fetch('/api/status').then(res => res.json()).then(data => {
                 document.getElementById('cpu-text').innerText = data.cpu + '%';
                 document.getElementById('ram-text').innerText = data.ram + '%';
-
                 let statusEl = document.getElementById('status-text');
                 statusEl.innerText = data.status;
                 statusEl.className = data.status.includes('شغال') ? 'stat-value status-online' : 'stat-value status-offline';
-
                 document.getElementById('players-count').innerText = data.players.length;
-
-                // تحديث الآي بي
                 let ipDisplay = document.getElementById('ip-display');
                 ipDisplay.innerText = data.network.ip;
                 if(data.network.status === 'error') ipDisplay.className = 'ip-badge ip-error';
                 else ipDisplay.className = 'ip-badge ip-connected';
-                // تحديث الكونسول
                 consoleBox.innerHTML = data.logs.join('<br>');
                 if (autoScroll) consoleBox.scrollTop = consoleBox.scrollHeight;
-                // تحديث اللاعبين
                 let p_html = data.players.length === 0 ? '<p style="color: #94a3b8;">لا يوجد لاعبين متصلين حالياً.</p>' : '';
                 data.players.forEach(p => {
                     p_html += `
@@ -632,7 +595,6 @@ DASHBOARD_HTML = """
                 showToast(act === 'start' ? '🚀 جاري التشغيل...' : '🛑 تم إرسال أمر الإيقاف', 'info');
             });
         }
-        // --- Mods ---
         function loadMods() {
             fetch('/api/mods').then(res => res.json()).then(mods => {
                 let html = mods.length === 0 ? '<p style="color: #94a3b8;">لا توجد مودات مثبتة.</p>' : '';
@@ -670,7 +632,6 @@ DASHBOARD_HTML = """
                 loadMods();
             });
         }
-        // --- File Manager ---
         function loadFiles() {
             fetch('/api/files').then(res => res.json()).then(files => {
                 let html = files.length === 0 ? '<p style="color: #94a3b8;">لا توجد ملفات.</p>' : '';
@@ -709,7 +670,6 @@ DASHBOARD_HTML = """
                 loadFiles();
             });
         }
-        // --- Backups ---
         function loadBackups() {
             fetch('/api/backup').then(res => res.json()).then(backups => {
                 let html = backups.length === 0 ? '<p style="color: #94a3b8;">لا توجد نسخ احتياطية.</p>' : '';
@@ -729,7 +689,6 @@ DASHBOARD_HTML = """
                 setTimeout(loadBackups, 5000);
             });
         }
-        // --- Config ---
         function loadConfig() {
             fetch('/api/config').then(res => res.json()).then(data => {
                 let html = '';
@@ -766,6 +725,11 @@ DASHBOARD_HTML = """
             };
             fetch('/api/config', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) }).then(() => {
                 showToast('💾 تم حفظ الإعدادات! أعد تشغيل السيرفر لتطبيقها.');
+            });
+        }
+        function loadCrash() {
+            fetch('/api/crash').then(res => res.text()).then(text => {
+                document.getElementById('crash-box').innerText = text;
             });
         }
     </script>
