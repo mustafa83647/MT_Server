@@ -64,22 +64,29 @@ def setup_environment():
 # ==========================================
 def start_playit():
     global playit_process, network_info, server_logs
-    secret_path = os.path.join(DATA_DIR, "playit.secret")
+
+    # إجبار Playit على حفظ إعداداته في البوكت الدائم
+    env = os.environ.copy()
+    env["HOME"] = DATA_DIR
 
     playit_process = subprocess.Popen(
-        ["playit", "--secret", secret_path],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+        ["playit"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        stdin=subprocess.DEVNULL, # السر هنا: منع البرنامج من التعليق وانتظار إدخال من الكيبورد
+        text=True,
+        bufsize=1,
+        env=env
     )
+
     for line in playit_process.stdout:
         clean_line = ansi_escape.sub('', line.strip())
-
         # صيد رابط التفعيل (Claim Link)
         claim_match = re.search(r'(https://playit\.gg/claim/[a-zA-Z0-9]+)', clean_line)
         if claim_match:
             network_info["claim_link"] = claim_match.group(1)
             network_info["status"] = "claim"
             server_logs.append(f"[الشبكة] ⚠️ مطلوب تفعيل الآي بي! الرابط: {network_info['claim_link']}")
-
         # صيد الآي بي الثابت بعد التفعيل
         ip_match = re.search(r'([a-zA-Z0-9\-]+\.(?:auto\.playit\.gg|playit\.gg|joinmc\.link):\d+)', clean_line)
         if ip_match:
@@ -91,22 +98,26 @@ def start_playit():
 def start_minecraft():
     global mc_process, server_logs, online_players
     if mc_process and mc_process.poll() is None: return
+
     setup_environment()
     online_players.clear()
     server_logs.append("[النظام] 🚀 جاري إطلاق سيرفر ماين كرافت...")
+
     mc_process = subprocess.Popen(
         ["java", "-Xms2G", "-Xmx10G", "-jar", "fabric-server-launch.jar", "nogui"],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE, text=True, cwd=APP_DIR
     )
+
     for line in mc_process.stdout:
         clean_line = ansi_escape.sub('', line.strip())
         server_logs.append(clean_line)
         if len(server_logs) > 300: server_logs.pop(0)
+
         join_match = re.search(r': ([a-zA-Z0-9_]+) joined the game', clean_line)
         if join_match: online_players.add(join_match.group(1))
+
         leave_match = re.search(r': ([a-zA-Z0-9_]+) left the game', clean_line)
         if leave_match and leave_match.group(1) in online_players: online_players.remove(leave_match.group(1))
-
     server_logs.append("[النظام] 🛑 توقف سيرفر ماين كرافت.")
     online_players.clear()
 threading.Thread(target=start_playit, daemon=True).start()
@@ -266,28 +277,28 @@ DASHBOARD_HTML = """
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; }
+
         /* Toast Notifications */
         #toast-container { position: fixed; bottom: 20px; left: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
         .toast { background: #1e293b; color: white; padding: 15px 25px; border-radius: 8px; border-right: 4px solid #38bdf8; box-shadow: 0 4px 15px rgba(0,0,0,0.3); animation: slideIn 0.3s ease-out forwards; font-weight: bold; }
         @keyframes slideIn { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+
         /* Header & Network */
         .header { display: flex; justify-content: space-between; align-items: center; background: linear-gradient(145deg, #1e293b, #0f172a); padding: 20px; border-radius: 16px; border: 1px solid #334155; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
         .header h2 { margin: 0; color: #38bdf8; display: flex; align-items: center; gap: 10px; text-shadow: 0 2px 10px rgba(56, 189, 248, 0.2); }
-
         .network-box { display: flex; align-items: center; gap: 10px; background: rgba(15, 23, 42, 0.6); padding: 8px 15px; border-radius: 10px; border: 1px solid #334155; }
         .ip-badge { font-weight: bold; font-size: 18px; letter-spacing: 1px; }
         .ip-connected { color: #34d399; }
         .ip-loading { color: #94a3b8; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
-
         .btn-copy { background: #334155; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; transition: 0.3s; font-size: 14px; }
         .btn-copy:hover { background: #475569; }
         .btn-claim { background: #f59e0b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; animation: glow 2s infinite alternate; box-shadow: 0 0 15px rgba(245, 158, 11, 0.4); }
         @keyframes glow { from { box-shadow: 0 0 10px rgba(245, 158, 11, 0.4); } to { box-shadow: 0 0 20px rgba(245, 158, 11, 0.8); } }
-
         .btn-logout { background: #ef4444; color: white; padding: 10px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; transition: 0.3s; }
         .btn-logout:hover { background: #dc2626; }
+
         /* Stats Grid */
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
         .stat-card { background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; text-align: center; transition: transform 0.3s; }
@@ -296,6 +307,7 @@ DASHBOARD_HTML = """
         .stat-value { font-size: 26px; font-weight: bold; color: #f8fafc; }
         .status-online { color: #34d399; text-shadow: 0 0 10px rgba(52, 211, 153, 0.3); }
         .status-offline { color: #ef4444; }
+
         /* Tabs */
         .tabs-nav { display: flex; gap: 10px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px; }
         .tab-btn { background: #1e293b; color: #94a3b8; border: 1px solid #334155; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap; transition: 0.3s; }
@@ -304,6 +316,7 @@ DASHBOARD_HTML = """
         .tab-content { display: none; background: #1e293b; padding: 25px; border-radius: 12px; border: 1px solid #334155; animation: fadeIn 0.3s; }
         .tab-content.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
         /* Console */
         .console-wrapper { background: #020617; border-radius: 8px; border: 1px solid #334155; overflow: hidden; }
         .console-output { padding: 15px; height: 50vh; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 14px; color: #a3e635; direction: ltr; text-align: left; line-height: 1.5; }
@@ -311,6 +324,7 @@ DASHBOARD_HTML = """
         .console-input { flex: 1; background: transparent; border: none; padding: 15px; color: white; font-family: monospace; font-size: 15px; outline: none; }
         .console-btn { background: #0ea5e9; color: white; border: none; padding: 0 25px; cursor: pointer; font-weight: bold; transition: 0.3s; }
         .console-btn:hover { background: #0284c7; }
+
         /* Buttons & Forms */
         .action-bar { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
         .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: white; transition: 0.3s; display: inline-flex; align-items: center; gap: 8px; }
@@ -318,15 +332,18 @@ DASHBOARD_HTML = """
         .btn-red { background: #ef4444; } .btn-red:hover { background: #dc2626; }
         .btn-blue { background: #3b82f6; } .btn-blue:hover { background: #2563eb; }
         .btn-orange { background: #f59e0b; } .btn-orange:hover { background: #d97706; }
+
         /* Lists */
         .list-item { display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #334155; transition: 0.2s; }
         .list-item:hover { border-color: #475569; }
         .list-item-title { font-weight: bold; font-size: 16px; }
         .list-actions { display: flex; gap: 8px; }
+
         /* Config Form */
         .config-row { display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #334155; }
         .config-row select, .config-row input { background: #1e293b; color: white; border: 1px solid #475569; padding: 8px 12px; border-radius: 6px; outline: none; font-weight: bold; }
         .config-row input:focus, .config-row select:focus { border-color: #38bdf8; }
+
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
@@ -463,9 +480,11 @@ DASHBOARD_HTML = """
             fetch('/api/status').then(res => res.json()).then(data => {
                 document.getElementById('cpu-text').innerText = data.cpu + '%';
                 document.getElementById('ram-text').innerText = data.ram + '%';
+
                 let statusEl = document.getElementById('status-text');
                 statusEl.innerText = data.status;
                 statusEl.className = data.status.includes('شغال') ? 'stat-value status-online' : 'stat-value status-offline';
+
                 document.getElementById('players-count').innerText = data.players.length;
                 // Network Area Logic (Playit)
                 let netArea = document.getElementById('network-area');
@@ -536,6 +555,7 @@ DASHBOARD_HTML = """
             if(fileInput.files.length === 0) return showToast('الرجاء اختيار ملف المود أولاً!', 'error');
             let formData = new FormData();
             formData.append("file", fileInput.files[0]);
+
             let btn = event.target;
             let originalText = btn.innerText;
             btn.innerText = "⏳ جاري الرفع...";
