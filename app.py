@@ -67,35 +67,28 @@ def setup_environment():
 # ==========================================
 def start_playit():
     global playit_process, network_info, server_logs
-    # سحب الكود السري من إعدادات هيجين فيس
+
     secret = os.environ.get("PLAYIT_SECRET")
+    # سحب الآي بي الثابت من الإعدادات لعرضه باللوحة
+    static_ip = os.environ.get("PLAYIT_IP", "شغال (انسخ الآي بي من موقع Playit)")
     if not secret:
         network_info["status"] = "error"
         network_info["ip"] = "يرجى إضافة PLAYIT_SECRET"
-        server_logs.append("[الشبكة] ❌ خطأ: لم تقم بإضافة PLAYIT_SECRET في إعدادات السبيس (Secrets)!")
+        server_logs.append("[الشبكة] ❌ خطأ: لم يتم العثور على PLAYIT_SECRET!")
         return
     env = os.environ.copy()
     env["HOME"] = DATA_DIR
+    # تشغيل الأداة بصمت تام (DEVNULL) لمنع تعليق البايثون
     playit_process = subprocess.Popen(
         ["playit", "--secret", secret],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
         stdin=subprocess.DEVNULL,
-        text=True,
-        bufsize=1,
         env=env
     )
-    for line in playit_process.stdout:
-        clean_line = ansi_escape.sub('', line.strip())
-
-        # صيد الآي بي الثابت
-        ip_match = re.search(r'([a-zA-Z0-9\-]+\.(?:auto\.playit\.gg|playit\.gg|joinmc\.link):\d+)', clean_line)
-        if ip_match:
-            new_ip = ip_match.group(1)
-            if network_info["ip"] != new_ip:
-                network_info["ip"] = new_ip
-                network_info["status"] = "connected"
-                server_logs.append(f"[الشبكة] 🟢 تم الاتصال! الآي بي الثابت: {new_ip}")
+    network_info["status"] = "connected"
+    network_info["ip"] = static_ip
+    server_logs.append("[الشبكة] 🟢 تم ربط Playit بنجاح بالخلفية.")
 def start_minecraft():
     global mc_process, server_logs, online_players
     if mc_process and mc_process.poll() is None: return
