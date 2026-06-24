@@ -10,11 +10,14 @@ from collections import deque
 from flask import Flask, render_template_string, request, redirect, session, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 # ==========================================
-# 1. الإعدادات الأساسية (Configuration)
+# 1. الإعدادات الأساسية والأمنية (Security & Config)
 # ==========================================
 app = Flask(__name__)
-app.secret_key = "super_secret_key_minecraft_god_tier"
-PASSWORD = "2938"
+# 🛡️ حماية الجلسات: توليد مفتاح تشفير عشوائي معقد جداً في كل مرة يشتغل فيها السيرفر
+app.secret_key = os.environ.get("FLASK_SECRET", os.urandom(24))
+# 🔒 سحب الباسورد من أسرار السبيس (Secrets) لمنع كشفه في GitHub
+# إذا نسيت تحطه بالسبيس، راح يستخدم "2938" كاحتياط حتى ما تنقفل اللوحة بوجهك
+PASSWORD = os.environ.get("PANEL_PASSWORD", "2938")
 DATA_DIR = "/data/minecraft_data"
 APP_DIR = "/app/minecraft"
 # متغيرات التحكم (Thread-Safe)
@@ -44,15 +47,17 @@ def force_symlink(src, dst):
 def setup_environment():
     """تهيئة بيئة السيرفر بالكامل"""
     server_logs.append("[النظام] 🛠️ جاري تهيئة بيئة السيرفر (Enterprise Mode)...")
+
     # إنشاء المجلدات الأساسية في البوكت
     os.makedirs(os.path.join(DATA_DIR, "world"), exist_ok=True)
     os.makedirs(os.path.join(DATA_DIR, "mods"), exist_ok=True)
     os.makedirs(os.path.join(DATA_DIR, "config"), exist_ok=True)
     os.makedirs(os.path.join(DATA_DIR, "backups"), exist_ok=True)
-
     os.makedirs(APP_DIR, exist_ok=True)
+
     # ربط مجلد العالم فقط (لأن ماين كرافت تتعامل معه بدون مشاكل)
     force_symlink(os.path.join(DATA_DIR, "world"), os.path.join(APP_DIR, "world"))
+
     # إنشاء وربط الملفات الأساسية
     files_to_link = ['server.properties', 'ops.json', 'banned-players.json', 'banned-ips.json', 'whitelist.json', 'usercache.json']
     for f in files_to_link:
@@ -64,9 +69,11 @@ def setup_environment():
                 elif f.endswith('.json'):
                     file.write("[]\n")
         force_symlink(file_path, os.path.join(APP_DIR, f))
+
     # الموافقة على شروط اللعبة
     with open(os.path.join(APP_DIR, "eula.txt"), 'w') as f:
         f.write("eula=true\n")
+
     # تحميل محرك Fabric إذا لم يكن موجوداً
     fabric_jar = os.path.join(APP_DIR, "fabric-server-launch.jar")
     if not os.path.exists(fabric_jar):
@@ -76,6 +83,7 @@ def setup_environment():
         subprocess.run(["java", "-jar", "fabric-installer.jar", "server", "-mcversion", "1.20.4", "-loader", "0.15.7", "-downloadMinecraft"], cwd=APP_DIR)
         if os.path.exists(installer_path):
             os.remove(installer_path)
+
     server_logs.append("[النظام] ✅ تمت التهيئة بنجاح. البيئة جاهزة.")
 # ==========================================
 # 3. إدارة العمليات (Playit & Minecraft)
@@ -83,18 +91,21 @@ def setup_environment():
 def start_playit():
     """تشغيل Playit مع مراقبة دقيقة جداً للمخرجات"""
     global playit_process, network_info
+
     secret = os.environ.get("PLAYIT_SECRET")
     static_ip = os.environ.get("PLAYIT_IP", "الآي بي الثابت (انسخه من موقع Playit)")
+
     if not secret:
         network_info["status"] = "error"
         network_info["ip"] = "مفقود PLAYIT_SECRET"
         server_logs.append("[Playit] ❌ خطأ قاتل: لم يتم العثور على PLAYIT_SECRET في إعدادات السبيس!")
         return
-
     secret = secret.strip()
     env = os.environ.copy()
     env["HOME"] = DATA_DIR
+
     server_logs.append("[Playit] 🔄 جاري بدء الاتصال بخوادم Playit العالمية...")
+
     try:
         playit_process = subprocess.Popen(
             ["playit", "--secret", secret],
@@ -105,28 +116,34 @@ def start_playit():
             bufsize=1,
             env=env
         )
+
         network_info["status"] = "connected"
         network_info["ip"] = static_ip
+
         for line in playit_process.stdout:
             clean_line = ansi_escape.sub('', line.strip())
             if not clean_line: continue
+
             if "error" in clean_line.lower() or "invalid" in clean_line.lower() or "fail" in clean_line.lower():
                 server_logs.append(f"[Playit] ❌ {clean_line}")
             elif "tunnel" in clean_line.lower() or "registered" in clean_line.lower() or "connected" in clean_line.lower():
                 server_logs.append(f"[Playit] 🌐 {clean_line}")
+
     except Exception as e:
         server_logs.append(f"[Playit] ❌ انهيار في أداة الشبكة: {e}")
 def start_minecraft():
     """تشغيل ماين كرافت مع حل مشكلة المودات وأكواد الأداء"""
     global mc_process, online_players
+
     if mc_process and mc_process.poll() is None:
         return
-
     setup_environment()
     online_players.clear()
+
     # الحل السحري: توجيه Fabric مباشرة للبوكت بدون اختصارات
     mods_dir = os.path.join(DATA_DIR, "mods")
     config_dir = os.path.join(DATA_DIR, "config")
+
     java_args = [
         "java",
         "-Xms2G",
@@ -154,7 +171,9 @@ def start_minecraft():
         "-jar", "fabric-server-launch.jar",
         "nogui"
     ]
+
     server_logs.append("[Minecraft] 🚀 جاري إطلاق السيرفر مع تحسينات الأداء (Aikar's Flags)...")
+
     try:
         mc_process = subprocess.Popen(
             java_args,
@@ -165,18 +184,20 @@ def start_minecraft():
             bufsize=1,
             cwd=APP_DIR
         )
+
         for line in mc_process.stdout:
             clean_line = ansi_escape.sub('', line.strip())
             if not clean_line: continue
+
             server_logs.append(clean_line)
 
             join_match = re.search(r': ([a-zA-Z0-9_]+) joined the game', clean_line)
             if join_match:
                 online_players.add(join_match.group(1))
-
             leave_match = re.search(r': ([a-zA-Z0-9_]+) left the game', clean_line)
             if leave_match and leave_match.group(1) in online_players:
                 online_players.remove(leave_match.group(1))
+
         server_logs.append("[Minecraft] 🛑 توقف السيرفر.")
     except Exception as e:
         server_logs.append(f"[Minecraft] ❌ فشل في تشغيل الجافا: {e}")
@@ -552,9 +573,11 @@ DASHBOARD_HTML = """
             fetch('/api/status').then(res => res.json()).then(data => {
                 document.getElementById('cpu-text').innerText = data.cpu + '%';
                 document.getElementById('ram-text').innerText = data.ram + '%';
+
                 let statusEl = document.getElementById('status-text');
                 statusEl.innerText = data.status;
                 statusEl.className = data.status.includes('شغال') ? 'stat-value status-online' : 'stat-value status-offline';
+
                 document.getElementById('players-count').innerText = data.players.length;
                 let ipDisplay = document.getElementById('ip-display');
                 ipDisplay.innerText = data.network.ip;
@@ -613,10 +636,12 @@ DASHBOARD_HTML = """
             if(fileInput.files.length === 0) return showToast('الرجاء اختيار ملف المود أولاً!', 'error');
             let formData = new FormData();
             formData.append("file", fileInput.files[0]);
+
             let btn = event.target;
             let originalText = btn.innerText;
             btn.innerText = "⏳ جاري الرفع...";
             btn.disabled = true;
+
             fetch('/api/mods', { method: 'POST', body: formData }).then(() => {
                 showToast('✅ تم رفع المود بنجاح!');
                 fileInput.value = '';
