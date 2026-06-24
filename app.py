@@ -223,12 +223,19 @@ def action():
     return "OK"
 @app.route('/api/command', methods=['POST'])
 def send_command():
+    if not session.get('logged_in'): return "Unauthorized", 401
     cmd = request.form.get('cmd')
+
+    # 💥 الأمر السري لمسح العالم
+    if cmd.strip() == "!resetworld":
+        import shutil
+        shutil.rmtree(os.path.join(DATA_DIR, "world"), ignore_errors=True)
+        server_logs.append("[النظام] 💥 تم فرمتة العالم القديم بنجاح! أوقف السيرفر وشغله من جديد لتوليد عالم بالسيد الجديد.")
+        return "OK"
     if mc_process and mc_process.poll() is None and cmd.strip():
         mc_process.stdin.write(cmd + "\n"); mc_process.stdin.flush()
         server_logs.append(f"[أنت] > {html.escape(cmd)}")
     return "OK"
-@app.route('/api/mods', methods=['GET', 'POST'])
 def handle_mods():
     mods_path = os.path.join(DATA_DIR, "mods")
     if request.method == 'POST':
