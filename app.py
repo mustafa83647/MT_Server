@@ -6,20 +6,26 @@ import subprocess
 import re
 import shutil
 import psutil
+import html
 from collections import deque
-from flask import Flask, render_template_string, request, redirect, session, jsonify, send_from_directory
-from werkzeug.utils import secure_filename
+from flask import Flask, render_template_string, request, redirect, session, jsonify, send_from_directory, abort
 # ==========================================
 # 1. الإعدادات الأساسية والأمنية (Security & Config)
 # ==========================================
 app = Flask(__name__)
-# 🛡️ حماية الجلسات: توليد مفتاح تشفير عشوائي معقد جداً في كل مرة يشتغل فيها السيرفر
-app.secret_key = os.environ.get("FLASK_SECRET", os.urandom(24))
-# 🔒 سحب الباسورد من أسرار السبيس (Secrets) لمنع كشفه في GitHub
-# إذا نسيت تحطه بالسبيس، راح يستخدم "2938" كاحتياط حتى ما تنقفل اللوحة بوجهك
+# 🛡️ تأمين الجلسات (Session Security)
+app.secret_key = os.environ.get("FLASK_SECRET", os.urandom(32))
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['PERMANENT_SESSION_LIFETIME'] = 86400 # الجلسة تنتهي بعد 24 ساعة
 PASSWORD = os.environ.get("PANEL_PASSWORD", "2938")
 DATA_DIR = "/data/minecraft_data"
 APP_DIR = "/app/minecraft"
+# 🛡️ نظام الحماية من التخمين (Anti-Brute Force)
+failed_logins = {}
+MAX_ATTEMPTS = 5
+LOCKOUT_TIME = 900 # 15 دقيقة بالثواني
 # متغيرات التحكم (Thread-Safe)
 mc_process = None
 playit_process = None
@@ -35,7 +41,6 @@ ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 # 2. دوال النظام المساعدة (Helper Functions)
 # ==========================================
 def force_symlink(src, dst):
-    """دالة ذكية لربط الملفات بالبوكت بدون أخطاء"""
     try:
         if os.path.islink(dst) or os.path.isfile(dst):
             os.remove(dst)
@@ -43,164 +48,108 @@ def force_symlink(src, dst):
             shutil.rmtree(dst)
         os.symlink(src, dst)
     except Exception as e:
-        server_logs.append(f"[النظام] ⚠️ تحذير أثناء ربط {os.path.basename(dst)}: {e}")
+        server_logs.append(f"[النظام] ⚠️ تحذير أثناء ربط {os.path.basename(dst)}: {html.escape(str(e))}")
 def setup_environment():
-    """تهيئة بيئة السيرفر بالكامل"""
-    server_logs.append("[النظام] 🛠️ جاري تهيئة بيئة السيرفر (Enterprise Mode)...")
-
-    # إنشاء المجلدات الأساسية في البوكت
+    server_logs.append("[النظام] 🛠️ جاري تهيئة بيئة السيرفر (Secure Mode)...")
     os.makedirs(os.path.join(DATA_DIR, "world"), exist_ok=True)
     os.makedirs(os.path.join(DATA_DIR, "mods"), exist_ok=True)
     os.makedirs(os.path.join(DATA_DIR, "config"), exist_ok=True)
     os.makedirs(os.path.join(DATA_DIR, "backups"), exist_ok=True)
     os.makedirs(APP_DIR, exist_ok=True)
-
-    # ربط مجلد العالم فقط (لأن ماين كرافت تتعامل معه بدون مشاكل)
     force_symlink(os.path.join(DATA_DIR, "world"), os.path.join(APP_DIR, "world"))
-
-    # إنشاء وربط الملفات الأساسية
     files_to_link = ['server.properties', 'ops.json', 'banned-players.json', 'banned-ips.json', 'whitelist.json', 'usercache.json']
     for f in files_to_link:
         file_path = os.path.join(DATA_DIR, f)
         if not os.path.exists(file_path):
             with open(file_path, 'w') as file:
-                if f == 'server.properties':
-                    file.write("online-mode=false\n")
-                elif f.endswith('.json'):
-                    file.write("[]\n")
+                if f == 'server.properties': file.write("online-mode=false\n")
+                elif f.endswith('.json'): file.write("[]\n")
         force_symlink(file_path, os.path.join(APP_DIR, f))
-
-    # الموافقة على شروط اللعبة
-    with open(os.path.join(APP_DIR, "eula.txt"), 'w') as f:
-        f.write("eula=true\n")
-
-    # تحميل محرك Fabric إذا لم يكن موجوداً
+    with open(os.path.join(APP_DIR, "eula.txt"), 'w') as f: f.write("eula=true\n")
     fabric_jar = os.path.join(APP_DIR, "fabric-server-launch.jar")
     if not os.path.exists(fabric_jar):
-        server_logs.append("[النظام] ⬇️ جاري تحميل محرك Fabric (1.20.4)...")
+        server_logs.append("[النظام] ⬇️ جاري تحميل محرك Fabric...")
         installer_path = os.path.join(APP_DIR, "fabric-installer.jar")
         subprocess.run(["wget", "-q", "-O", installer_path, "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.jar"])
         subprocess.run(["java", "-jar", "fabric-installer.jar", "server", "-mcversion", "1.20.4", "-loader", "0.15.7", "-downloadMinecraft"], cwd=APP_DIR)
-        if os.path.exists(installer_path):
-            os.remove(installer_path)
-
-    server_logs.append("[النظام] ✅ تمت التهيئة بنجاح. البيئة جاهزة.")
+        if os.path.exists(installer_path): os.remove(installer_path)
+    server_logs.append("[النظام] ✅ تمت التهيئة بنجاح.")
 # ==========================================
 # 3. إدارة العمليات (Playit & Minecraft)
 # ==========================================
 def start_playit():
-    """تشغيل Playit مع مراقبة دقيقة جداً للمخرجات"""
     global playit_process, network_info
-
     secret = os.environ.get("PLAYIT_SECRET")
     static_ip = os.environ.get("PLAYIT_IP", "الآي بي الثابت (انسخه من موقع Playit)")
 
     if not secret:
         network_info["status"] = "error"
         network_info["ip"] = "مفقود PLAYIT_SECRET"
-        server_logs.append("[Playit] ❌ خطأ قاتل: لم يتم العثور على PLAYIT_SECRET في إعدادات السبيس!")
+        server_logs.append("[Playit] ❌ خطأ: لم يتم العثور على PLAYIT_SECRET!")
         return
-    secret = secret.strip()
     env = os.environ.copy()
     env["HOME"] = DATA_DIR
-
-    server_logs.append("[Playit] 🔄 جاري بدء الاتصال بخوادم Playit العالمية...")
-
+    server_logs.append("[Playit] 🔄 جاري بدء الاتصال بخوادم Playit...")
     try:
         playit_process = subprocess.Popen(
-            ["playit", "--secret", secret],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            stdin=subprocess.DEVNULL,
-            text=True,
-            bufsize=1,
-            env=env
+            ["playit", "--secret", secret.strip()],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, text=True, bufsize=1, env=env
         )
-
         network_info["status"] = "connected"
         network_info["ip"] = static_ip
-
         for line in playit_process.stdout:
             clean_line = ansi_escape.sub('', line.strip())
             if not clean_line: continue
 
+            # 🛡️ حماية XSS: تنظيف مخرجات Playit
+            safe_line = html.escape(clean_line)
+
             if "error" in clean_line.lower() or "invalid" in clean_line.lower() or "fail" in clean_line.lower():
-                server_logs.append(f"[Playit] ❌ {clean_line}")
+                server_logs.append(f"[Playit] ❌ {safe_line}")
             elif "tunnel" in clean_line.lower() or "registered" in clean_line.lower() or "connected" in clean_line.lower():
-                server_logs.append(f"[Playit] 🌐 {clean_line}")
-
+                server_logs.append(f"[Playit] 🌐 {safe_line}")
     except Exception as e:
-        server_logs.append(f"[Playit] ❌ انهيار في أداة الشبكة: {e}")
+        server_logs.append(f"[Playit] ❌ انهيار في أداة الشبكة: {html.escape(str(e))}")
 def start_minecraft():
-    """تشغيل ماين كرافت مع حل مشكلة المودات وأكواد الأداء"""
     global mc_process, online_players
-
-    if mc_process and mc_process.poll() is None:
-        return
+    if mc_process and mc_process.poll() is None: return
     setup_environment()
     online_players.clear()
-
-    # الحل السحري: توجيه Fabric مباشرة للبوكت بدون اختصارات
     mods_dir = os.path.join(DATA_DIR, "mods")
     config_dir = os.path.join(DATA_DIR, "config")
-
     java_args = [
-        "java",
-        "-Xms2G",
-        "-Xmx10G",
-        f"-Dfabric.modsDir={mods_dir}",
-        f"-Dfabric.configDir={config_dir}",
-        "-XX:+UseG1GC",
-        "-XX:+ParallelRefProcEnabled",
-        "-XX:MaxGCPauseMillis=200",
-        "-XX:+UnlockExperimentalVMOptions",
-        "-XX:+DisableExplicitGC",
-        "-XX:+AlwaysPreTouch",
-        "-XX:G1NewSizePercent=30",
-        "-XX:G1MaxNewSizePercent=40",
-        "-XX:G1HeapRegionSize=8M",
-        "-XX:G1ReservePercent=20",
-        "-XX:G1HeapWastePercent=5",
-        "-XX:G1MixedGCCountTarget=4",
-        "-XX:InitiatingHeapOccupancyPercent=15",
-        "-XX:G1MixedGCLiveThresholdPercent=90",
-        "-XX:G1RSetUpdatingPauseTimePercent=5",
-        "-XX:SurvivorRatio=32",
-        "-XX:+PerfDisableSharedMem",
-        "-XX:MaxTenuringThreshold=1",
-        "-jar", "fabric-server-launch.jar",
-        "nogui"
+        "java", "-Xms2G", "-Xmx6G",
+        f"-Dfabric.modsDir={mods_dir}", f"-Dfabric.configDir={config_dir}",
+        "-XX:+UseG1GC", "-XX:+ParallelRefProcEnabled", "-XX:MaxGCPauseMillis=200",
+        "-XX:+UnlockExperimentalVMOptions", "-XX:+DisableExplicitGC", "-XX:+AlwaysPreTouch",
+        "-XX:G1NewSizePercent=30", "-XX:G1MaxNewSizePercent=40", "-XX:G1HeapRegionSize=8M",
+        "-XX:G1ReservePercent=20", "-XX:G1HeapWastePercent=5", "-XX:G1MixedGCCountTarget=4",
+        "-XX:InitiatingHeapOccupancyPercent=15", "-XX:G1MixedGCLiveThresholdPercent=90",
+        "-XX:G1RSetUpdatingPauseTimePercent=5", "-XX:SurvivorRatio=32", "-XX:+PerfDisableSharedMem",
+        "-XX:MaxTenuringThreshold=1", "-jar", "fabric-server-launch.jar", "nogui"
     ]
-
-    server_logs.append("[Minecraft] 🚀 جاري إطلاق السيرفر مع تحسينات الأداء (Aikar's Flags)...")
-
+    server_logs.append("[Minecraft] 🚀 جاري إطلاق السيرفر...")
     try:
         mc_process = subprocess.Popen(
-            java_args,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            stdin=subprocess.PIPE,
-            text=True,
-            bufsize=1,
-            cwd=APP_DIR
+            java_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE, text=True, bufsize=1, cwd=APP_DIR
         )
-
         for line in mc_process.stdout:
             clean_line = ansi_escape.sub('', line.strip())
             if not clean_line: continue
 
-            server_logs.append(clean_line)
-
+            # 🛡️ حماية XSS: تنظيف مخرجات اللعبة (يمنع اللاعبين من اختراق اللوحة عبر الشات)
+            safe_line = html.escape(clean_line)
+            server_logs.append(safe_line)
             join_match = re.search(r': ([a-zA-Z0-9_]+) joined the game', clean_line)
-            if join_match:
-                online_players.add(join_match.group(1))
+            if join_match: online_players.add(html.escape(join_match.group(1)))
+
             leave_match = re.search(r': ([a-zA-Z0-9_]+) left the game', clean_line)
-            if leave_match and leave_match.group(1) in online_players:
-                online_players.remove(leave_match.group(1))
+            if leave_match and html.escape(leave_match.group(1)) in online_players:
+                online_players.remove(html.escape(leave_match.group(1)))
 
         server_logs.append("[Minecraft] 🛑 توقف السيرفر.")
     except Exception as e:
-        server_logs.append(f"[Minecraft] ❌ فشل في تشغيل الجافا: {e}")
+        server_logs.append(f"[Minecraft] ❌ فشل في تشغيل الجافا: {html.escape(str(e))}")
     finally:
         online_players.clear()
 threading.Thread(target=start_playit, daemon=True).start()
@@ -208,21 +157,46 @@ threading.Thread(target=start_minecraft, daemon=True).start()
 # ==========================================
 # 4. مسارات الويب (API & Routes)
 # ==========================================
+@app.before_request
+def check_auth():
+    """🛡️ Middleware للتحقق من تسجيل الدخول لكل مسارات الـ API"""
+    if request.path.startswith('/api/') and not session.get('logged_in'):
+        abort(401)
 @app.route('/')
 def index():
     if not session.get('logged_in'): return render_template_string(LOGIN_HTML)
     return render_template_string(DASHBOARD_HTML)
 @app.route('/login', methods=['POST'])
 def login():
-    if request.form.get('password') == PASSWORD: session['logged_in'] = True
-    return redirect('/')
+    ip = request.remote_addr
+    current_time = time.time()
+
+    # 🛡️ التحقق من الحظر (Anti-Brute Force)
+    if ip in failed_logins:
+        attempts, lockout_time = failed_logins[ip]
+        if current_time < lockout_time:
+            return f"تم حظر عنوان IP الخاص بك مؤقتاً لدواعي أمنية. حاول بعد {int((lockout_time - current_time)/60)} دقيقة.", 429
+        elif current_time >= lockout_time and attempts >= MAX_ATTEMPTS:
+            # فك الحظر بعد انتهاء الوقت
+            failed_logins.pop(ip, None)
+    if request.form.get('password') == PASSWORD:
+        session.permanent = True
+        session['logged_in'] = True
+        failed_logins.pop(ip, None) # تصفير المحاولات عند النجاح
+        return redirect('/')
+    else:
+        # تسجيل محاولة فاشلة
+        attempts, _ = failed_logins.get(ip, (0, 0))
+        attempts += 1
+        lockout = current_time + LOCKOUT_TIME if attempts >= MAX_ATTEMPTS else 0
+        failed_logins[ip] = (attempts, lockout)
+        return render_template_string(LOGIN_HTML, error="كلمة المرور غير صحيحة!")
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect('/')
 @app.route('/api/status')
 def status():
-    if not session.get('logged_in'): return "Unauthorized", 401
     is_running = mc_process and mc_process.poll() is None
     return jsonify({
         "cpu": psutil.cpu_percent(),
@@ -234,7 +208,6 @@ def status():
     })
 @app.route('/api/action', methods=['POST'])
 def action():
-    if not session.get('logged_in'): return "Unauthorized", 401
     act = request.form.get('action')
     global mc_process
     if act == "stop" and mc_process and mc_process.poll() is None:
@@ -248,32 +221,34 @@ def action():
     return "OK"
 @app.route('/api/command', methods=['POST'])
 def send_command():
-    if not session.get('logged_in'): return "Unauthorized", 401
     cmd = request.form.get('cmd')
     if mc_process and mc_process.poll() is None and cmd.strip():
         mc_process.stdin.write(cmd + "\n"); mc_process.stdin.flush()
-        server_logs.append(f"[أنت] > {cmd}")
+        server_logs.append(f"[أنت] > {html.escape(cmd)}")
     return "OK"
 @app.route('/api/mods', methods=['GET', 'POST'])
 def handle_mods():
-    if not session.get('logged_in'): return "Unauthorized", 401
     mods_path = os.path.join(DATA_DIR, "mods")
     if request.method == 'POST':
         if 'file' in request.files:
             file = request.files['file']
-            if file.filename.endswith('.jar'): file.save(os.path.join(mods_path, secure_filename(file.filename)))
+            if file.filename.endswith('.jar'):
+                # 🛡️ حماية من رفع ملفات بأسماء خبيثة
+                safe_name = secure_filename(file.filename)
+                file.save(os.path.join(mods_path, safe_name))
         elif 'delete' in request.form:
-            try: os.remove(os.path.join(mods_path, request.form.get('delete')))
+            try:
+                safe_name = secure_filename(request.form.get('delete'))
+                os.remove(os.path.join(mods_path, safe_name))
             except: pass
         return "OK"
     return jsonify([f for f in os.listdir(mods_path) if f.endswith('.jar')] if os.path.exists(mods_path) else [])
 @app.route('/api/backup', methods=['GET', 'POST'])
 def handle_backup():
-    if not session.get('logged_in'): return "Unauthorized", 401
     backup_dir = os.path.join(DATA_DIR, "backups")
     if request.method == 'POST':
         def make_backup():
-            server_logs.append("[النظام] ⏳ جاري ضغط العالم، قد يستغرق الأمر دقيقة...")
+            server_logs.append("[النظام] ⏳ جاري ضغط العالم...")
             timestamp = time.strftime('%Y%m%d-%H%M%S')
             shutil.make_archive(os.path.join(backup_dir, f"world_backup_{timestamp}"), 'zip', os.path.join(DATA_DIR, "world"))
             server_logs.append("[النظام] ✅ اكتملت النسخة الاحتياطية!")
@@ -282,11 +257,11 @@ def handle_backup():
     return jsonify([f for f in os.listdir(backup_dir) if f.endswith('.zip')] if os.path.exists(backup_dir) else [])
 @app.route('/api/backup/download/<filename>')
 def download_backup(filename):
-    if not session.get('logged_in'): return "Unauthorized", 401
-    return send_from_directory(os.path.join(DATA_DIR, "backups"), filename, as_attachment=True)
+    # 🛡️ حماية Path Traversal
+    safe_name = secure_filename(filename)
+    return send_from_directory(os.path.join(DATA_DIR, "backups"), safe_name, as_attachment=True)
 @app.route('/api/config', methods=['GET', 'POST'])
 def handle_config():
-    if not session.get('logged_in'): return "Unauthorized", 401
     config_path = os.path.join(DATA_DIR, "server.properties")
     if request.method == 'POST':
         data = request.json
@@ -311,12 +286,17 @@ def handle_config():
     return jsonify(props)
 @app.route('/api/files', methods=['GET', 'POST'])
 def file_manager():
-    if not session.get('logged_in'): return "Unauthorized", 401
     if request.method == 'POST':
         action = request.form.get('action')
         target = request.form.get('target')
-        target_path = os.path.join(DATA_DIR, target)
-        if not os.path.abspath(target_path).startswith(DATA_DIR): return "Access Denied", 403
+
+        # 🛡️ حماية Path Traversal (تخطي المسارات) المتقدمة
+        target_path = os.path.realpath(os.path.join(DATA_DIR, target))
+        safe_dir = os.path.realpath(DATA_DIR)
+
+        if not target_path.startswith(safe_dir):
+            return "Access Denied - Security Violation", 403
+
         if action == 'delete':
             try:
                 if os.path.isfile(target_path): os.remove(target_path)
@@ -327,6 +307,7 @@ def file_manager():
             try:
                 with open(target_path, 'r', encoding='utf-8') as f: return f.read()
             except Exception as e: return str(e), 500
+
     file_list = []
     for root, dirs, files in os.walk(DATA_DIR):
         if 'world' in root or 'backups' in root: continue
@@ -337,12 +318,11 @@ def file_manager():
     return jsonify(file_list)
 @app.route('/api/crash')
 def get_crash():
-    if not session.get('logged_in'): return "Unauthorized", 401
     crash_dir = os.path.join(APP_DIR, "crash-reports")
     if not os.path.exists(crash_dir): return "لا توجد كراشات."
     crashes = sorted([f for f in os.listdir(crash_dir) if f.endswith('.txt')], reverse=True)
     if not crashes: return "السيرفر مستقر، لا توجد تقارير كراش."
-    with open(os.path.join(crash_dir, crashes[0]), 'r') as f: return f.read()
+    with open(os.path.join(crash_dir, crashes[0]), 'r') as f: return html.escape(f.read())
 # ==========================================
 # 5. واجهات المستخدم (HTML/CSS/JS)
 # ==========================================
@@ -362,11 +342,13 @@ LOGIN_HTML = """
         input:focus { border-color: #38bdf8; box-shadow: 0 0 15px rgba(56, 189, 248, 0.3); }
         button { width: 100%; padding: 15px; background: linear-gradient(135deg, #0ea5e9, #2563eb); color: white; border: none; border-radius: 10px; cursor: pointer; font-size: 18px; font-weight: bold; transition: 0.3s; box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4); }
         button:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(14, 165, 233, 0.6); }
+        .error-msg { color: #ef4444; margin-bottom: 15px; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="login-container">
         <h2>🎮 لوحة تحكم السيرفر</h2>
+        {% if error %}<div class="error-msg">{{ error }}</div>{% endif %}
         <form action="/login" method="POST">
             <input type="password" name="password" placeholder="أدخل الرمز السري..." required autofocus>
             <button type="submit">تسجيل الدخول</button>
@@ -573,18 +555,19 @@ DASHBOARD_HTML = """
             fetch('/api/status').then(res => res.json()).then(data => {
                 document.getElementById('cpu-text').innerText = data.cpu + '%';
                 document.getElementById('ram-text').innerText = data.ram + '%';
-
                 let statusEl = document.getElementById('status-text');
                 statusEl.innerText = data.status;
                 statusEl.className = data.status.includes('شغال') ? 'stat-value status-online' : 'stat-value status-offline';
-
                 document.getElementById('players-count').innerText = data.players.length;
+
                 let ipDisplay = document.getElementById('ip-display');
                 ipDisplay.innerText = data.network.ip;
                 if(data.network.status === 'error') ipDisplay.className = 'ip-badge ip-error';
                 else ipDisplay.className = 'ip-badge ip-connected';
+
                 consoleBox.innerHTML = data.logs.join('<br>');
                 if (autoScroll) consoleBox.scrollTop = consoleBox.scrollHeight;
+
                 let p_html = data.players.length === 0 ? '<p style="color: #94a3b8;">لا يوجد لاعبين متصلين حالياً.</p>' : '';
                 data.players.forEach(p => {
                     p_html += `
@@ -636,12 +619,10 @@ DASHBOARD_HTML = """
             if(fileInput.files.length === 0) return showToast('الرجاء اختيار ملف المود أولاً!', 'error');
             let formData = new FormData();
             formData.append("file", fileInput.files[0]);
-
             let btn = event.target;
             let originalText = btn.innerText;
             btn.innerText = "⏳ جاري الرفع...";
             btn.disabled = true;
-
             fetch('/api/mods', { method: 'POST', body: formData }).then(() => {
                 showToast('✅ تم رفع المود بنجاح!');
                 fileInput.value = '';
