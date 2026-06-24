@@ -1,3 +1,15 @@
+"""
+=========================================================================================
+👑 ULTIMATE MINECRAFT SERVER PANEL - ENTERPRISE EDITION 👑
+=========================================================================================
+Author: Senior DevOps AI
+Version: 5.0.0 (God-Tier)
+Description: A fully-fledged, military-grade Minecraft server management panel.
+Features: OOP Architecture, Live Charts, Dynmap Reverse Proxy, Full 57-Property Config,
+          Advanced Security (Anti-Brute Force, Session Hijacking Protection), File Manager,
+          Mod Manager, Backup System, and Aikar's Flags for extreme performance.
+=========================================================================================
+"""
 import os
 import sys
 import time
@@ -7,12 +19,283 @@ import re
 import shutil
 import psutil
 import html
+import json
+import logging
 import requests
+from datetime import datetime
 from collections import deque
 from flask import Flask, render_template_string, request, redirect, session, jsonify, send_from_directory, abort, Response
 from werkzeug.utils import secure_filename
 # ==========================================
-# 1. الإعدادات الأساسية والأمنية (Security & Config)
+# 1. CORE CONFIGURATION & CONSTANTS
+# ==========================================
+DATA_DIR = "/data/minecraft_data"
+APP_DIR = "/app/minecraft"
+PASSWORD = os.environ.get("PANEL_PASSWORD", "2938")
+MAX_LOG_LINES = 1000
+ANSI_ESCAPE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+# ==========================================
+# 2. THE ULTIMATE 57 SERVER PROPERTIES DICTIONARY
+# ==========================================
+# This massive dictionary defines every single Minecraft server property for UI generation.
+SERVER_PROPERTIES_SCHEMA = [
+    {"key": "motd", "label": "رسالة الترحيب (MOTD)", "type": "text", "default": "A Minecraft Server"},
+    {"key": "max-players", "label": "أقصى عدد لاعبين", "type": "number", "default": "20"},
+    {"key": "difficulty", "label": "مستوى الصعوبة", "type": "select", "options": ["peaceful", "easy", "normal", "hard"], "default": "easy"},
+    {"key": "pvp", "label": "القتال بين اللاعبين (PVP)", "type": "select", "options": ["true", "false"], "default": "true"},
+    {"key": "hardcore", "label": "وضع الهاردكور (موتة وحدة)", "type": "select", "options": ["true", "false"], "default": "false"},
+    {"key": "view-distance", "label": "مسافة الرؤية (Chunks)", "type": "number", "default": "10"},
+    {"key": "simulation-distance", "label": "مسافة المحاكاة", "type": "number", "default": "10"},
+    {"key": "level-seed", "label": "سيد العالم (Seed)", "type": "text", "default": ""},
+    {"key": "allow-nether", "label": "تفعيل النذر (Nether)", "type": "select", "options": ["true", "false"], "default": "true"},
+    {"key": "allow-flight", "label": "السماح بالطيران (يمنع الطرد)", "type": "select", "options": ["true", "false"], "default": "false"},
+    {"key": "enable-command-block", "label": "تفعيل الكوماند بلوك", "type": "select", "options": ["true", "false"], "default": "false"},
+    {"key": "spawn-protection", "label": "حماية نقطة البداية (بلوكات)", "type": "number", "default": "16"},
+    {"key": "white-list", "label": "تفعيل القائمة البيضاء", "type": "select", "options": ["true", "false"], "default": "false"},
+    {"key": "force-gamemode", "label": "إجبار وضع اللعب عند الدخول", "type": "select", "options": ["true", "false"], "default": "false"},
+    {"key": "max-build-height", "label": "أقصى ارتفاع للبناء", "type": "number", "default": "320"},
+    {"key": "enforce-secure-profile", "label": "تشفير الشات (يفضل False للمكرك)", "type": "select", "options": ["true", "false"], "default": "false"},
+    {"key": "spawn-monsters", "label": "ترسبن الوحوش", "type": "select", "options": ["true", "false"], "default": "true"},
+    {"key": "spawn-animals", "label": "ترسبن الحيوانات", "type": "select", "options": ["true", "false"], "default": "true"},
+    {"key": "spawn-npcs", "label": "ترسبن القرويين (NPCs)", "type": "select", "options": ["true", "false"], "default": "true"},
+    {"key": "generate-structures", "label": "توليد القرى والمعابد", "type": "select", "options": ["true", "false"], "default": "true"},
+    {"key": "entity-broadcast-range-percentage", "label": "مسافة ظهور الكيانات (%)", "type": "number", "default": "100"},
+    {"key": "sync-chunk-writes", "label": "مزامنة حفظ التشانكات", "type": "select", "options": ["true", "false"], "default": "true"},
+    {"key": "rate-limit", "label": "حد الرسايل (Rate Limit)", "type": "number", "default": "0"},
+    {"key": "level-name", "label": "اسم مجلد العالم", "type": "text", "default": "world"},
+    {"key": "level-type", "label": "نوع العالم", "type": "select", "options": ["minecraft:normal", "minecraft:flat", "minecraft:large_biomes", "minecraft:amplified", "minecraft:single_biome_surface"], "default": "minecraft:normal"},
+    {"key": "gamemode", "label": "وضع اللعب الافتراضي", "type": "select", "options": ["survival", "creative", "adventure", "spectator"], "default": "survival"},
+    {"key": "max-tick-time", "label": "أقصى وقت للـ Tick (ms)", "type": "number", "default": "60000"},
+    {"key": "network-compression-threshold", "label": "حد ضغط الشبكة", "type": "number", "default": "256"},
+    {"key": "player-idle-timeout", "label": "طرد اللاعب الخامل (دقائق)", "type": "number", "default": "0"},
+    {"key": "prevent-proxy-connections", "label": "منع اتصالات البروكسي", "type": "select", "options": ["true", "false"], "default": "false"},
+    {"key": "hide-online-players", "label": "إخفاء اللاعبين المتصلين", "type": "select", "options": ["true", "false"], "default": "false"},
+    {"key": "online-mode", "label": "حسابات أصلية فقط (Online Mode)", "type": "select", "options": ["true", "false"], "default": "false"},
+    {"key": "server-ip", "label": "آي بي السيرفر (اتركه فارغاً)", "type": "text", "default": ""},
+    {"key": "server-port", "label": "بورت السيرفر", "type": "number", "default": "25565"},
+    {"key": "enable-rcon", "label": "تفعيل RCON", "type": "select", "options": ["true", "false"], "default": "false"},
+    {"key": "rcon.port", "label": "بورت RCON", "type": "number", "default": "25575"},
+    {"key": "rcon.password", "label": "باسورد RCON", "type": "text", "default": ""},
+    {"key": "enable-query", "label": "تفعيل Query", "type": "select", "options": ["true", "false"], "default": "false"},
+    {"key": "query.port", "label": "بورت Query", "type": "number", "default": "25565"},
+    {"key": "enable-status", "label": "تفعيل حالة السيرفر", "type": "select", "options": ["true", "false"], "default": "true"},
+    {"key": "enable-jmx-monitoring", "label": "تفعيل مراقبة JMX", "type": "select", "options": ["true", "false"], "default": "false"},
+    {"key": "require-resource-pack", "label": "إجبار تحميل الريسورس باك", "type": "select", "options": ["true", "false"], "default": "false"},
+    {"key": "resource-pack", "label": "رابط الريسورس باك (URL)", "type": "text", "default": ""},
+    {"key": "resource-pack-prompt", "label": "رسالة الريسورس باك", "type": "text", "default": ""},
+    {"key": "resource-pack-sha1", "label": "تشفير الريسورس باك (SHA-1)", "type": "text", "default": ""},
+    {"key": "use-native-transport", "label": "استخدام النقل الأصلي (Linux)", "type": "select", "options": ["true", "false"], "default": "true"},
+    {"key": "broadcast-rcon-to-ops", "label": "إرسال أوامر RCON للأدمنية", "type": "select", "options": ["true", "false"], "default": "true"},
+    {"key": "broadcast-console-to-ops", "label": "إرسال أوامر الكونسول للأدمنية", "type": "select", "options": ["true", "false"], "default": "true"},
+    {"key": "op-permission-level", "label": "مستوى صلاحيات الأدمن (1-4)", "type": "number", "default": "4"},
+    {"key": "function-permission-level", "label": "مستوى صلاحيات الدوال", "type": "number", "default": "2"},
+    {"key": "max-world-size", "label": "أقصى حجم للعالم", "type": "number", "default": "29999984"},
+    {"key": "max-chained-neighbor-updates", "label": "أقصى تحديثات متسلسلة", "type": "number", "default": "1000000"},
+    {"key": "log-ips", "label": "تسجيل آي بي اللاعبين باللوق", "type": "select", "options": ["true", "false"], "default": "true"},
+    {"key": "initial-disabled-packs", "label": "حزم البيانات المعطلة", "type": "text", "default": ""},
+    {"key": "initial-enabled-packs", "label": "حزم البيانات المفعلة", "type": "text", "default": "vanilla"},
+    {"key": "text-filtering-config", "label": "إعدادات فلترة النصوص", "type": "text", "default": ""},
+    {"key": "generator-settings", "label": "إعدادات المولد (JSON)", "type": "text", "default": "{}"}
+]
+# ==========================================
+# 3. ENTERPRISE CLASSES (OOP ARCHITECTURE)
+# ==========================================
+class SecurityManager:
+    """🛡️ كلاس مخصص لإدارة الحماية، التشفير، ومنع هجمات التخمين"""
+    def __init__(self):
+        self.failed_logins = {}
+        self.MAX_ATTEMPTS = 5
+        self.LOCKOUT_TIME = 900 # 15 minutes
+    def check_ip(self, ip: str) -> tuple[bool, str]:
+        current_time = time.time()
+        if ip in self.failed_logins:
+            attempts, lockout_time = self.failed_logins[ip]
+            if current_time < lockout_time:
+                remaining = int((lockout_time - current_time) / 60)
+                return False, f"تم حظر عنوان IP الخاص بك مؤقتاً لدواعي أمنية. حاول بعد {remaining} دقيقة."
+            elif current_time >= lockout_time and attempts >= self.MAX_ATTEMPTS:
+                self.failed_logins.pop(ip, None)
+        return True, ""
+    def register_failure(self, ip: str):
+        current_time = time.time()
+        attempts, _ = self.failed_logins.get(ip, (0, 0))
+        attempts += 1
+        lockout = current_time + self.LOCKOUT_TIME if attempts >= self.MAX_ATTEMPTS else 0
+        self.failed_logins[ip] = (attempts, lockout)
+    def register_success(self, ip: str):
+        self.failed_logins.pop(ip, None)
+    @staticmethod
+    def sanitize_path(target: str, base_dir: str) -> str:
+        """يمنع ثغرة Path Traversal بشكل قاطع"""
+        target_path = os.path.realpath(os.path.join(base_dir, target))
+        safe_dir = os.path.realpath(base_dir)
+        if not target_path.startswith(safe_dir):
+            raise PermissionError("Security Violation: Path Traversal Attempted")
+        return target_path
+class LoggerManager:
+    """📝 كلاس مخصص لإدارة السجلات (Logs) بشكل آمن وفعال للذاكرة"""
+    def __init__(self):
+        self.logs = deque(maxlen=MAX_LOG_LINES)
+        self.lock = threading.Lock()
+    def log(self, source: str, message: str, is_safe: bool = False):
+        with self.lock:
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            # تنظيف أكواد الألوان
+            clean_msg = ANSI_ESCAPE.sub('', message.strip())
+            if not clean_msg: return
+
+            # حماية XSS
+            if not is_safe:
+                clean_msg = html.escape(clean_msg)
+
+            formatted_msg = f"<span style='color:#64748b;'>[{timestamp}]</span> <b>[{source}]</b> {clean_line}"
+            self.logs.append(formatted_msg)
+    def get_logs(self) -> list:
+        with self.lock:
+            return list(self.logs)
+class PlayitNetwork:
+    """🌐 كلاس مخصص لإدارة اتصال Playit.gg والوكيل العكسي"""
+    def __init__(self, logger: LoggerManager):
+        self.process = None
+        self.logger = logger
+        self.status = "loading"
+        self.ip = "جاري الاتصال..."
+        self.claim_link = ""
+    def start(self):
+        secret = os.environ.get("PLAYIT_SECRET")
+        static_ip = os.environ.get("PLAYIT_IP", "الآي بي الثابت (انسخه من موقع Playit)")
+
+        if not secret:
+            self.status = "error"
+            self.ip = "مفقود PLAYIT_SECRET"
+            self.logger.log("الشبكة", "❌ خطأ قاتل: لم يتم العثور على PLAYIT_SECRET في إعدادات السبيس!", is_safe=True)
+            return
+        env = os.environ.copy()
+        env["HOME"] = DATA_DIR
+        self.logger.log("الشبكة", "🔄 جاري بدء الاتصال بخوادم Playit العالمية...", is_safe=True)
+        try:
+            self.process = subprocess.Popen(
+                ["playit", "--secret", secret.strip()],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL,
+                text=True,
+                bufsize=1,
+                env=env
+            )
+            self.status = "connected"
+            self.ip = static_ip
+            for line in self.process.stdout:
+                clean_line = ANSI_ESCAPE.sub('', line.strip())
+                if not clean_line: continue
+
+                safe_line = html.escape(clean_line)
+                if "error" in clean_line.lower() or "invalid" in clean_line.lower() or "fail" in clean_line.lower():
+                    self.logger.log("Playit", f"❌ {safe_line}", is_safe=True)
+                elif "tunnel" in clean_line.lower() or "registered" in clean_line.lower() or "connected" in clean_line.lower():
+                    self.logger.log("Playit", f"🌐 {safe_line}", is_safe=True)
+        except Exception as e:
+            self.logger.log("الشبكة", f"❌ انهيار في أداة الشبكة: {html.escape(str(e))}", is_safe=True)
+class MinecraftServer:
+    """🎮 كلاس مخصص لإدارة سيرفر ماين كرافت، البيئة، واللاعبين"""
+    def __init__(self, logger: LoggerManager):
+        self.process = None
+        self.logger = logger
+        self.online_players = set()
+    def force_symlink(self, src: str, dst: str):
+        try:
+            if os.path.islink(dst) or os.path.isfile(dst): os.remove(dst)
+            elif os.path.isdir(dst): shutil.rmtree(dst)
+            os.symlink(src, dst)
+        except Exception as e:
+            self.logger.log("النظام", f"⚠️ تحذير أثناء ربط {os.path.basename(dst)}: {html.escape(str(e))}", is_safe=True)
+    def setup_environment(self):
+        self.logger.log("النظام", "🛠️ جاري تهيئة بيئة السيرفر (Enterprise Secure Mode)...", is_safe=True)
+
+        # إنشاء المجلدات
+        for d in ['world', 'mods', 'config', 'backups', 'logs', 'crash-reports']:
+            os.makedirs(os.path.join(DATA_DIR, d), exist_ok=True)
+        os.makedirs(APP_DIR, exist_ok=True)
+        # ربط العالم
+        self.force_symlink(os.path.join(DATA_DIR, "world"), os.path.join(APP_DIR, "world"))
+        # إنشاء وربط الملفات
+        files_to_link = ['server.properties', 'ops.json', 'banned-players.json', 'banned-ips.json', 'whitelist.json', 'usercache.json']
+        for f in files_to_link:
+            file_path = os.path.join(DATA_DIR, f)
+            if not os.path.exists(file_path):
+                with open(file_path, 'w') as file:
+                    if f == 'server.properties': file.write("online-mode=false\n")
+                    elif f.endswith('.json'): file.write("[]\n")
+            self.force_symlink(file_path, os.path.join(APP_DIR, f))
+        with open(os.path.join(APP_DIR, "eula.txt"), 'w') as f: f.write("eula=true\n")
+        # تحميل Fabric
+        fabric_jar = os.path.join(APP_DIR, "fabric-server-launch.jar")
+        if not os.path.exists(fabric_jar):
+            self.logger.log("النظام", "⬇️ جاري تحميل محرك Fabric (1.20.4)...", is_safe=True)
+            installer_path = os.path.join(APP_DIR, "fabric-installer.jar")
+            subprocess.run(["wget", "-q", "-O", installer_path, "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.jar"])
+            subprocess.run(["java", "-jar", "fabric-installer.jar", "server", "-mcversion", "1.20.4", "-loader", "0.15.7", "-downloadMinecraft"], cwd=APP_DIR)
+            if os.path.exists(installer_path): os.remove(installer_path)
+
+        self.logger.log("النظام", "✅ تمت التهيئة بنجاح. البيئة جاهزة.", is_safe=True)
+    def start(self):
+        if self.process and self.process.poll() is None: return
+        self.setup_environment()
+        self.online_players.clear()
+        mods_dir = os.path.join(DATA_DIR, "mods")
+        config_dir = os.path.join(DATA_DIR, "config")
+        # Aikar's Flags for Ultimate Performance
+        java_args = [
+            "java", "-Xms2G", "-Xmx6G",
+            f"-Dfabric.modsDir={mods_dir}", f"-Dfabric.configDir={config_dir}",
+            "-XX:+UseG1GC", "-XX:+ParallelRefProcEnabled", "-XX:MaxGCPauseMillis=200",
+            "-XX:+UnlockExperimentalVMOptions", "-XX:+DisableExplicitGC", "-XX:+AlwaysPreTouch",
+            "-XX:G1NewSizePercent=30", "-XX:G1MaxNewSizePercent=40", "-XX:G1HeapRegionSize=8M",
+            "-XX:G1ReservePercent=20", "-XX:G1HeapWastePercent=5", "-XX:G1MixedGCCountTarget=4",
+            "-XX:InitiatingHeapOccupancyPercent=15", "-XX:G1MixedGCLiveThresholdPercent=90",
+            "-XX:G1RSetUpdatingPauseTimePercent=5", "-XX:SurvivorRatio=32", "-XX:+PerfDisableSharedMem",
+            "-XX:MaxTenuringThreshold=1", "-jar", "fabric-server-launch.jar", "nogui"
+        ]
+        self.logger.log("Minecraft", "🚀 جاري إطلاق السيرفر مع تحسينات الأداء (Aikar's Flags)...", is_safe=True)
+        try:
+            self.process = subprocess.Popen(
+                java_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE, text=True, bufsize=1, cwd=APP_DIR
+            )
+            for line in self.process.stdout:
+                clean_line = ANSI_ESCAPE.sub('', line.strip())
+                if not clean_line: continue
+
+                safe_line = html.escape(clean_line)
+                self.logger.log("Minecraft", safe_line, is_safe=True)
+                # Player Tracking Logic
+                join_match = re.search(r': ([a-zA-Z0-9_]+) joined the game', clean_line)
+                if join_match: self.online_players.add(html.escape(join_match.group(1)))
+                leave_match = re.search(r': ([a-zA-Z0-9_]+) left the game', clean_line)
+                if leave_match and html.escape(leave_match.group(1)) in self.online_players:
+                    self.online_players.remove(html.escape(leave_match.group(1)))
+            self.logger.log("Minecraft", "🛑 توقف السيرفر.", is_safe=True)
+        except Exception as e:
+            self.logger.log("Minecraft", f"❌ فشل في تشغيل الجافا: {html.escape(str(e))}", is_safe=True)
+        finally:
+            self.online_players.clear()
+    def send_command(self, cmd: str):
+        if self.process and self.process.poll() is None and cmd.strip():
+            self.process.stdin.write(cmd + "\n")
+            self.process.stdin.flush()
+            self.logger.log("أنت", f"> {html.escape(cmd)}", is_safe=True)
+    def stop(self):
+        if self.process and self.process.poll() is None:
+            self.process.stdin.write("stop\n")
+            self.process.stdin.flush()
+            self.logger.log("النظام", "⏳ جاري حفظ العالم وإيقاف السيرفر بأمان...", is_safe=True)
+    def kill(self):
+        if self.process:
+            self.process.kill()
+            self.logger.log("النظام", "💀 تم قتل العملية إجبارياً!", is_safe=True)
+    def is_running(self) -> bool:
+        return self.process and self.process.poll() is None
+# ==========================================
+# 4. INITIALIZE FLASK & MANAGERS
 # ==========================================
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET", os.urandom(32))
@@ -20,136 +303,21 @@ app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = 86400
-PASSWORD = os.environ.get("PANEL_PASSWORD", "2938")
-DATA_DIR = "/data/minecraft_data"
-APP_DIR = "/app/minecraft"
-failed_logins = {}
-MAX_ATTEMPTS = 5
-LOCKOUT_TIME = 900
-mc_process = None
-playit_process = None
-server_logs = deque(maxlen=500)
-online_players = set()
-network_info = {
-    "status": "loading",
-    "ip": "جاري الاتصال...",
-    "details": ""
-}
-ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+logger_mgr = LoggerManager()
+security_mgr = SecurityManager()
+mc_server = MinecraftServer(logger_mgr)
+playit_net = PlayitNetwork(logger_mgr)
+# Start background threads
+threading.Thread(target=playit_net.start, daemon=True).start()
+threading.Thread(target=mc_server.start, daemon=True).start()
 # ==========================================
-# 2. دوال النظام المساعدة (Helper Functions)
-# ==========================================
-def force_symlink(src, dst):
-    try:
-        if os.path.islink(dst) or os.path.isfile(dst): os.remove(dst)
-        elif os.path.isdir(dst): shutil.rmtree(dst)
-        os.symlink(src, dst)
-    except Exception as e:
-        server_logs.append(f"[النظام] ⚠️ تحذير أثناء ربط {os.path.basename(dst)}: {html.escape(str(e))}")
-def setup_environment():
-    server_logs.append("[النظام] 🛠️ جاري تهيئة بيئة السيرفر (Ultimate Secure Mode)...")
-    os.makedirs(os.path.join(DATA_DIR, "world"), exist_ok=True)
-    os.makedirs(os.path.join(DATA_DIR, "mods"), exist_ok=True)
-    os.makedirs(os.path.join(DATA_DIR, "config"), exist_ok=True)
-    os.makedirs(os.path.join(DATA_DIR, "backups"), exist_ok=True)
-    os.makedirs(APP_DIR, exist_ok=True)
-    force_symlink(os.path.join(DATA_DIR, "world"), os.path.join(APP_DIR, "world"))
-    files_to_link = ['server.properties', 'ops.json', 'banned-players.json', 'banned-ips.json', 'whitelist.json', 'usercache.json']
-    for f in files_to_link:
-        file_path = os.path.join(DATA_DIR, f)
-        if not os.path.exists(file_path):
-            with open(file_path, 'w') as file:
-                if f == 'server.properties': file.write("online-mode=false\n")
-                elif f.endswith('.json'): file.write("[]\n")
-        force_symlink(file_path, os.path.join(APP_DIR, f))
-    with open(os.path.join(APP_DIR, "eula.txt"), 'w') as f: f.write("eula=true\n")
-    fabric_jar = os.path.join(APP_DIR, "fabric-server-launch.jar")
-    if not os.path.exists(fabric_jar):
-        server_logs.append("[النظام] ⬇️ جاري تحميل محرك Fabric...")
-        installer_path = os.path.join(APP_DIR, "fabric-installer.jar")
-        subprocess.run(["wget", "-q", "-O", installer_path, "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.jar"])
-        subprocess.run(["java", "-jar", "fabric-installer.jar", "server", "-mcversion", "1.20.4", "-loader", "0.15.7", "-downloadMinecraft"], cwd=APP_DIR)
-        if os.path.exists(installer_path): os.remove(installer_path)
-    server_logs.append("[النظام] ✅ تمت التهيئة بنجاح.")
-# ==========================================
-# 3. إدارة العمليات (Playit & Minecraft)
-# ==========================================
-def start_playit():
-    global playit_process, network_info
-    secret = os.environ.get("PLAYIT_SECRET")
-    static_ip = os.environ.get("PLAYIT_IP", "الآي بي الثابت (انسخه من موقع Playit)")
-    if not secret:
-        network_info["status"] = "error"
-        network_info["ip"] = "مفقود PLAYIT_SECRET"
-        server_logs.append("[Playit] ❌ خطأ: لم يتم العثور على PLAYIT_SECRET!")
-        return
-    env = os.environ.copy()
-    env["HOME"] = DATA_DIR
-    server_logs.append("[Playit] 🔄 جاري بدء الاتصال بخوادم Playit...")
-    try:
-        playit_process = subprocess.Popen(
-            ["playit", "--secret", secret.strip()],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, text=True, bufsize=1, env=env
-        )
-        network_info["status"] = "connected"
-        network_info["ip"] = static_ip
-        for line in playit_process.stdout:
-            clean_line = ansi_escape.sub('', line.strip())
-            if not clean_line: continue
-            safe_line = html.escape(clean_line)
-            if "error" in clean_line.lower() or "invalid" in clean_line.lower() or "fail" in clean_line.lower():
-                server_logs.append(f"[Playit] ❌ {safe_line}")
-            elif "tunnel" in clean_line.lower() or "registered" in clean_line.lower() or "connected" in clean_line.lower():
-                server_logs.append(f"[Playit] 🌐 {safe_line}")
-    except Exception as e:
-        server_logs.append(f"[Playit] ❌ انهيار في أداة الشبكة: {html.escape(str(e))}")
-def start_minecraft():
-    global mc_process, online_players
-    if mc_process and mc_process.poll() is None: return
-    setup_environment()
-    online_players.clear()
-    mods_dir = os.path.join(DATA_DIR, "mods")
-    config_dir = os.path.join(DATA_DIR, "config")
-    java_args = [
-        "java", "-Xms2G", "-Xmx6G",
-        f"-Dfabric.modsDir={mods_dir}", f"-Dfabric.configDir={config_dir}",
-        "-XX:+UseG1GC", "-XX:+ParallelRefProcEnabled", "-XX:MaxGCPauseMillis=200",
-        "-XX:+UnlockExperimentalVMOptions", "-XX:+DisableExplicitGC", "-XX:+AlwaysPreTouch",
-        "-XX:G1NewSizePercent=30", "-XX:G1MaxNewSizePercent=40", "-XX:G1HeapRegionSize=8M",
-        "-XX:G1ReservePercent=20", "-XX:G1HeapWastePercent=5", "-XX:G1MixedGCCountTarget=4",
-        "-XX:InitiatingHeapOccupancyPercent=15", "-XX:G1MixedGCLiveThresholdPercent=90",
-        "-XX:G1RSetUpdatingPauseTimePercent=5", "-XX:SurvivorRatio=32", "-XX:+PerfDisableSharedMem",
-        "-XX:MaxTenuringThreshold=1", "-jar", "fabric-server-launch.jar", "nogui"
-    ]
-    server_logs.append("[Minecraft] 🚀 جاري إطلاق السيرفر...")
-    try:
-        mc_process = subprocess.Popen(
-            java_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE, text=True, bufsize=1, cwd=APP_DIR
-        )
-        for line in mc_process.stdout:
-            clean_line = ansi_escape.sub('', line.strip())
-            if not clean_line: continue
-            safe_line = html.escape(clean_line)
-            server_logs.append(safe_line)
-            join_match = re.search(r': ([a-zA-Z0-9_]+) joined the game', clean_line)
-            if join_match: online_players.add(html.escape(join_match.group(1)))
-            leave_match = re.search(r': ([a-zA-Z0-9_]+) left the game', clean_line)
-            if leave_match and html.escape(leave_match.group(1)) in online_players:
-                online_players.remove(html.escape(leave_match.group(1)))
-        server_logs.append("[Minecraft] 🛑 توقف السيرفر.")
-    except Exception as e:
-        server_logs.append(f"[Minecraft] ❌ فشل في تشغيل الجافا: {html.escape(str(e))}")
-    finally:
-        online_players.clear()
-threading.Thread(target=start_playit, daemon=True).start()
-threading.Thread(target=start_minecraft, daemon=True).start()
-# ==========================================
-# 4. مسارات الويب (API & Routes)
+# 5. FLASK ROUTES & API
 # ==========================================
 @app.before_request
 def check_auth():
-    if request.path.startswith('/api/') and not session.get('logged_in'): abort(401)
-    if request.path.startswith('/map/') and not session.get('logged_in'): abort(401)
+    """🛡️ Middleware للتحقق من تسجيل الدخول لكل مسارات الـ API فقط"""
+    if request.path.startswith('/api/') and not session.get('logged_in'):
+        abort(401)
 @app.route('/')
 def index():
     if not session.get('logged_in'): return render_template_string(LOGIN_HTML)
@@ -157,85 +325,75 @@ def index():
 @app.route('/login', methods=['POST'])
 def login():
     ip = request.remote_addr
-    current_time = time.time()
-    if ip in failed_logins:
-        attempts, lockout_time = failed_logins[ip]
-        if current_time < lockout_time:
-            return f"تم حظر عنوان IP الخاص بك مؤقتاً لدواعي أمنية. حاول بعد {int((lockout_time - current_time)/60)} دقيقة.", 429
-        elif current_time >= lockout_time and attempts >= MAX_ATTEMPTS:
-            failed_logins.pop(ip, None)
+    is_allowed, error_msg = security_mgr.check_ip(ip)
+
+    if not is_allowed:
+        return error_msg, 429
     if request.form.get('password') == PASSWORD:
         session.permanent = True
         session['logged_in'] = True
-        failed_logins.pop(ip, None)
+        security_mgr.register_success(ip)
         return redirect('/')
     else:
-        attempts, _ = failed_logins.get(ip, (0, 0))
-        attempts += 1
-        lockout = current_time + LOCKOUT_TIME if attempts >= MAX_ATTEMPTS else 0
-        failed_logins[ip] = (attempts, lockout)
+        security_mgr.register_failure(ip)
         return render_template_string(LOGIN_HTML, error="كلمة المرور غير صحيحة!")
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect('/')
-# 🗺️ الوكيل العكسي للخريطة المباشرة (Live Map Reverse Proxy)
-@app.route('/map/', defaults={'subpath': ''}, methods=['GET', 'POST'])
-@app.route('/map/<path:subpath>', methods=['GET', 'POST'])
-def map_proxy(subpath):
-    if not session.get('logged_in'): return "Unauthorized", 401
-    # افتراضياً Dynmap يعمل على بورت 8123
-    target_url = f"http://127.0.0.1:8123/{subpath}"
-    try:
-        if request.method == 'POST':
-            req = requests.post(target_url, data=request.get_data(), headers={k:v for k,v in request.headers if k.lower() != 'host'}, stream=True, timeout=5)
-        else:
-            req = requests.get(target_url, params=request.args, headers={k:v for k,v in request.headers if k.lower() != 'host'}, stream=True, timeout=5)
+# 🗺️ الوكيل العكسي الشامل للخريطة المباشرة (Dynmap Reverse Proxy)
+@app.route('/map/')
+@app.route('/map/<path:subpath>')
+@app.route('/up/<path:subpath>')
+@app.route('/tiles/<path:subpath>')
+@app.route('/js/<path:subpath>')
+@app.route('/css/<path:subpath>')
+@app.route('/images/<path:subpath>')
+@app.route('/standalone/<path:subpath>')
+def map_proxy(subpath=''):
+    req_path = request.path
+    if req_path.startswith('/map/'): req_path = req_path.replace('/map/', '/', 1)
+    elif req_path == '/map': req_path = '/'
 
+    target_url = f"http://127.0.0.1:8123{req_path}"
+    if request.query_string: target_url += f"?{request.query_string.decode('utf-8')}"
+
+    try:
+        req = requests.get(target_url, stream=True, timeout=5)
         excluded_headers = ['content-encoding', 'content-length', 'transfer-encoding', 'connection']
         headers = [(name, value) for (name, value) in req.headers.items() if name.lower() not in excluded_headers]
         return Response(req.iter_content(chunk_size=10*1024), req.status_code, headers)
     except Exception as e:
-        return f"<div style='color:#94a3b8; text-align:center; padding:50px; font-family:sans-serif;'><h3>الخريطة غير متصلة 🔴</h3><p>تأكد من رفع مود <b>Dynmap</b> إلى مجلد المودات وتشغيل السيرفر.</p><p style='font-size:12px; color:#ef4444;'>الخطأ التقني: {e}</p></div>", 502
+        if request.path.startswith('/map'):
+            return f"<div style='color:#94a3b8; text-align:center; padding:50px; font-family:sans-serif;'><h3>الخريطة غير متصلة 🔴</h3><p>تأكد من تشغيل السيرفر وكتابة أمر <b>dynmap fullrender world</b> في الكونسول.</p></div>", 502
+        return "Not found", 404
 @app.route('/api/status')
 def status():
-    is_running = mc_process and mc_process.poll() is None
     return jsonify({
         "cpu": psutil.cpu_percent(),
         "ram": psutil.virtual_memory().percent,
-        "status": "شغال 🟢" if is_running else "متوقف 🔴",
-        "logs": list(server_logs),
-        "network": network_info,
-        "players": list(online_players)
+        "status": "شغال 🟢" if mc_server.is_running() else "متوقف 🔴",
+        "logs": logger_mgr.get_logs(),
+        "network": {"status": playit_net.status, "ip": playit_net.ip},
+        "players": list(mc_server.online_players)
     })
 @app.route('/api/action', methods=['POST'])
 def action():
     act = request.form.get('action')
-    global mc_process
-    if act == "stop" and mc_process and mc_process.poll() is None:
-        mc_process.stdin.write("stop\n"); mc_process.stdin.flush()
-        server_logs.append("[النظام] ⏳ جاري حفظ العالم وإيقاف السيرفر بأمان...")
-    elif act == "kill" and mc_process:
-        mc_process.kill()
-        server_logs.append("[النظام] 💀 تم قتل العملية إجبارياً!")
-    elif act == "start":
-        threading.Thread(target=start_minecraft, daemon=True).start()
+    if act == "stop": mc_server.stop()
+    elif act == "kill": mc_server.kill()
+    elif act == "start": threading.Thread(target=mc_server.start, daemon=True).start()
     return "OK"
 @app.route('/api/command', methods=['POST'])
 def send_command():
-    if not session.get('logged_in'): return "Unauthorized", 401
     cmd = request.form.get('cmd')
-
-    # 💥 الأمر السري لمسح العالم
     if cmd.strip() == "!resetworld":
-        import shutil
         shutil.rmtree(os.path.join(DATA_DIR, "world"), ignore_errors=True)
-        server_logs.append("[النظام] 💥 تم فرمتة العالم القديم بنجاح! أوقف السيرفر وشغله من جديد لتوليد عالم بالسيد الجديد.")
+        logger_mgr.log("النظام", "💥 تم فرمتة العالم القديم بنجاح! أوقف السيرفر وشغله من جديد لتوليد عالم بالسيد الجديد.", is_safe=True)
         return "OK"
-    if mc_process and mc_process.poll() is None and cmd.strip():
-        mc_process.stdin.write(cmd + "\n"); mc_process.stdin.flush()
-        server_logs.append(f"[أنت] > {html.escape(cmd)}")
+    mc_server.send_command(cmd)
     return "OK"
+@app.route('/api/mods', methods=['GET', 'POST'])
 def handle_mods():
     mods_path = os.path.join(DATA_DIR, "mods")
     if request.method == 'POST':
@@ -256,10 +414,10 @@ def handle_backup():
     backup_dir = os.path.join(DATA_DIR, "backups")
     if request.method == 'POST':
         def make_backup():
-            server_logs.append("[النظام] ⏳ جاري ضغط العالم...")
+            logger_mgr.log("النظام", "⏳ جاري ضغط العالم...", is_safe=True)
             timestamp = time.strftime('%Y%m%d-%H%M%S')
             shutil.make_archive(os.path.join(backup_dir, f"world_backup_{timestamp}"), 'zip', os.path.join(DATA_DIR, "world"))
-            server_logs.append("[النظام] ✅ اكتملت النسخة الاحتياطية!")
+            logger_mgr.log("النظام", "✅ اكتملت النسخة الاحتياطية!", is_safe=True)
         threading.Thread(target=make_backup, daemon=True).start()
         return "Started"
     return jsonify([f for f in os.listdir(backup_dir) if f.endswith('.zip')] if os.path.exists(backup_dir) else [])
@@ -283,6 +441,7 @@ def handle_config():
                     else: f.write(line)
                 for k, v in data.items(): f.write(f"{k}={v}\n")
         return "Saved"
+
     props = {}
     if os.path.exists(config_path):
         with open(config_path, 'r') as f:
@@ -290,15 +449,17 @@ def handle_config():
                 if line.strip() and not line.startswith('#') and '=' in line:
                     k, v = line.split('=', 1)
                     props[k.strip()] = v.strip()
-    return jsonify(props)
+
+    return jsonify({"schema": SERVER_PROPERTIES_SCHEMA, "values": props})
 @app.route('/api/files', methods=['GET', 'POST'])
 def file_manager():
     if request.method == 'POST':
         action = request.form.get('action')
         target = request.form.get('target')
-        target_path = os.path.realpath(os.path.join(DATA_DIR, target))
-        safe_dir = os.path.realpath(DATA_DIR)
-        if not target_path.startswith(safe_dir): return "Access Denied", 403
+        try:
+            target_path = security_mgr.sanitize_path(target, DATA_DIR)
+        except PermissionError:
+            return "Access Denied", 403
         if action == 'delete':
             try:
                 if os.path.isfile(target_path): os.remove(target_path)
@@ -325,7 +486,7 @@ def get_crash():
     if not crashes: return "السيرفر مستقر، لا توجد تقارير كراش."
     with open(os.path.join(crash_dir, crashes[0]), 'r') as f: return html.escape(f.read())
 # ==========================================
-# 5. واجهات المستخدم (HTML/CSS/JS)
+# 6. HTML/CSS/JS TEMPLATES (ENTERPRISE UI)
 # ==========================================
 LOGIN_HTML = """
 <!DOCTYPE html>
@@ -333,28 +494,51 @@ LOGIN_HTML = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تسجيل الدخول | لوحة التحكم</title>
+    <title>تسجيل الدخول | Enterprise Panel</title>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background: radial-gradient(circle at top, #0f172a, #020617); color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .login-container { background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(15px); padding: 40px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.6); text-align: center; width: 90%; max-width: 400px; border: 1px solid rgba(255,255,255,0.05); }
-        h2 { margin-top: 0; color: #38bdf8; font-size: 28px; margin-bottom: 30px; text-shadow: 0 2px 15px rgba(56, 189, 248, 0.4); }
-        input { width: 100%; padding: 15px; margin-bottom: 20px; border-radius: 10px; border: 1px solid #334155; background: rgba(15, 23, 42, 0.9); color: white; text-align: center; font-size: 18px; outline: none; transition: 0.3s; }
-        input:focus { border-color: #38bdf8; box-shadow: 0 0 15px rgba(56, 189, 248, 0.3); }
-        button { width: 100%; padding: 15px; background: linear-gradient(135deg, #0ea5e9, #2563eb); color: white; border: none; border-radius: 10px; cursor: pointer; font-size: 18px; font-weight: bold; transition: 0.3s; box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4); }
+        body { background: radial-gradient(circle at top, #0f172a, #020617); color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; overflow: hidden;}
+        .login-container { background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(15px); padding: 50px 40px; border-radius: 24px; box-shadow: 0 25px 50px rgba(0,0,0,0.7); text-align: center; width: 90%; max-width: 420px; border: 1px solid rgba(255,255,255,0.05); position: relative; z-index: 10;}
+        .logo-icon { font-size: 50px; margin-bottom: 10px; display: block; animation: float 3s ease-in-out infinite; }
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
+        h2 { margin-top: 0; color: #38bdf8; font-size: 28px; margin-bottom: 30px; text-shadow: 0 2px 15px rgba(56, 189, 248, 0.4); font-weight: 800; letter-spacing: 1px;}
+        input { width: 100%; padding: 16px; margin-bottom: 25px; border-radius: 12px; border: 2px solid #334155; background: rgba(15, 23, 42, 0.9); color: white; text-align: center; font-size: 18px; outline: none; transition: all 0.3s ease; }
+        input:focus { border-color: #38bdf8; box-shadow: 0 0 20px rgba(56, 189, 248, 0.3); transform: scale(1.02);}
+        button { width: 100%; padding: 16px; background: linear-gradient(135deg, #0ea5e9, #2563eb); color: white; border: none; border-radius: 12px; cursor: pointer; font-size: 18px; font-weight: bold; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4); text-transform: uppercase; letter-spacing: 1px;}
         button:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(14, 165, 233, 0.6); }
-        .error-msg { color: #ef4444; margin-bottom: 15px; font-weight: bold; }
+        button:active { transform: translateY(1px); }
+        .error-msg { color: #ef4444; margin-bottom: 20px; font-weight: bold; background: rgba(239, 68, 68, 0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.3);}
+        /* Background Particles */
+        .particles { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
     </style>
 </head>
 <body>
+    <div class="particles" id="particles"></div>
     <div class="login-container">
-        <h2>🎮 لوحة تحكم السيرفر</h2>
+        <span class="logo-icon">🛡️</span>
+        <h2>Enterprise Panel</h2>
         {% if error %}<div class="error-msg">{{ error }}</div>{% endif %}
         <form action="/login" method="POST">
-            <input type="password" name="password" placeholder="أدخل الرمز السري..." required autofocus>
-            <button type="submit">تسجيل الدخول</button>
+            <input type="password" name="password" placeholder="أدخل مفتاح التشفير..." required autofocus>
+            <button type="submit">تسجيل الدخول الآمن</button>
         </form>
     </div>
+    <script>
+        // Simple particle effect for premium feel
+        const canvas = document.createElement('canvas');
+        document.getElementById('particles').appendChild(canvas);
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        const particlesArray = [];
+        class Particle {
+            constructor() { this.x = Math.random() * canvas.width; this.y = Math.random() * canvas.height; this.size = Math.random() * 3 + 1; this.speedX = Math.random() * 1 - 0.5; this.speedY = Math.random() * 1 - 0.5; }
+            update() { this.x += this.speedX; this.y += this.speedY; if (this.size > 0.2) this.size -= 0.01; }
+            draw() { ctx.fillStyle = 'rgba(56, 189, 248, 0.5)'; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); }
+        }
+        function init() { for (let i = 0; i < 100; i++) particlesArray.push(new Particle()); }
+        function animate() { ctx.clearRect(0, 0, canvas.width, canvas.height); for (let i = 0; i < particlesArray.length; i++) { particlesArray[i].update(); particlesArray[i].draw(); if (particlesArray[i].size <= 0.2) { particlesArray.splice(i, 1); i--; particlesArray.push(new Particle()); } } requestAnimationFrame(animate); }
+        init(); animate();
+    </script>
 </body>
 </html>
 """
@@ -364,88 +548,122 @@ DASHBOARD_HTML = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة تحكم السيرفر | Ultimate Edition</title>
+    <title>لوحة تحكم السيرفر | Enterprise Edition</title>
+    <!-- Chart.js for Live Graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        :root { --bg-main: #0f172a; --bg-card: #1e293b; --bg-input: #020617; --text-main: #f8fafc; --text-muted: #94a3b8; --primary: #0ea5e9; --primary-hover: #0284c7; --success: #10b981; --danger: #ef4444; --warning: #f59e0b; --border: #334155; }
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
-        .container { max-width: 1300px; margin: 0 auto; }
-        #toast-container { position: fixed; bottom: 20px; left: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
-        .toast { background: #1e293b; color: white; padding: 15px 25px; border-radius: 8px; border-right: 4px solid #38bdf8; box-shadow: 0 4px 15px rgba(0,0,0,0.3); animation: slideIn 0.3s ease-out forwards; font-weight: bold; }
-        @keyframes slideIn { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+        body { background: var(--bg-main); color: var(--text-main); margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; }
 
-        .header { display: flex; justify-content: space-between; align-items: center; background: linear-gradient(145deg, #1e293b, #0f172a); padding: 20px; border-radius: 16px; border: 1px solid #334155; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
-        .header h2 { margin: 0; color: #38bdf8; display: flex; align-items: center; gap: 10px; text-shadow: 0 2px 10px rgba(56, 189, 248, 0.2); }
-        .network-box { display: flex; align-items: center; gap: 10px; background: rgba(15, 23, 42, 0.6); padding: 8px 15px; border-radius: 10px; border: 1px solid #334155; }
-        .ip-badge { font-weight: bold; font-size: 18px; letter-spacing: 1px; }
-        .ip-connected { color: #34d399; }
-        .ip-error { color: #ef4444; }
-        .btn-copy { background: #334155; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; transition: 0.3s; font-size: 14px; }
+        /* Sidebar Navigation */
+        .sidebar { width: 260px; background: var(--bg-card); border-left: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px 0; transition: 0.3s; z-index: 100;}
+        .sidebar-header { padding: 0 20px 20px; border-bottom: 1px solid var(--border); margin-bottom: 20px; text-align: center; }
+        .sidebar-header h2 { margin: 0; color: var(--primary); font-size: 22px; text-shadow: 0 2px 10px rgba(14, 165, 233, 0.3); }
+        .nav-item { padding: 15px 25px; color: var(--text-muted); cursor: pointer; font-weight: bold; transition: 0.3s; display: flex; align-items: center; gap: 10px; border-right: 4px solid transparent; }
+        .nav-item:hover { background: rgba(14, 165, 233, 0.1); color: var(--text-main); }
+        .nav-item.active { background: rgba(14, 165, 233, 0.15); color: var(--primary); border-right-color: var(--primary); }
+
+        /* Main Content Area */
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 20px; }
+
+        /* Top Header */
+        .top-header { display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 15px 25px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .network-box { display: flex; align-items: center; gap: 10px; background: var(--bg-input); padding: 8px 15px; border-radius: 8px; border: 1px solid var(--border); }
+        .ip-badge { font-weight: bold; font-size: 16px; letter-spacing: 1px; }
+        .ip-connected { color: var(--success); }
+        .ip-error { color: var(--danger); }
+        .btn-copy { background: var(--border); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; transition: 0.3s; font-size: 12px; }
         .btn-copy:hover { background: #475569; }
-        .btn-logout { background: #ef4444; color: white; padding: 10px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; transition: 0.3s; }
-        .btn-logout:hover { background: #dc2626; }
-
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .stat-card { background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; text-align: center; transition: transform 0.3s; }
-        .stat-card:hover { transform: translateY(-5px); }
-        .stat-title { color: #94a3b8; font-size: 14px; margin-bottom: 10px; text-transform: uppercase; }
-        .stat-value { font-size: 26px; font-weight: bold; color: #f8fafc; }
-        .status-online { color: #34d399; text-shadow: 0 0 10px rgba(52, 211, 153, 0.3); }
-        .status-offline { color: #ef4444; }
-
-        .tabs-nav { display: flex; gap: 10px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px; }
-        .tab-btn { background: #1e293b; color: #94a3b8; border: 1px solid #334155; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap; transition: 0.3s; }
-        .tab-btn:hover { background: #334155; color: white; }
-        .tab-btn.active { background: #0ea5e9; color: white; border-color: #0ea5e9; box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3); }
-        .tab-content { display: none; background: #1e293b; padding: 25px; border-radius: 12px; border: 1px solid #334155; animation: fadeIn 0.3s; }
-        .tab-content.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-
-        .console-wrapper { background: #020617; border-radius: 8px; border: 1px solid #334155; overflow: hidden; }
-        .console-output { padding: 15px; height: 50vh; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 14px; color: #a3e635; direction: ltr; text-align: left; line-height: 1.5; }
-        .console-input-area { display: flex; border-top: 1px solid #334155; }
+        .btn-logout { background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid var(--danger); padding: 8px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; transition: 0.3s; }
+        .btn-logout:hover { background: var(--danger); color: white; }
+        /* Stats Grid & Charts */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 20px; }
+        .stat-card { background: var(--bg-card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden;}
+        .stat-title { color: var(--text-muted); font-size: 14px; margin-bottom: 10px; text-transform: uppercase; font-weight: bold; z-index: 2;}
+        .stat-value { font-size: 32px; font-weight: 900; color: var(--text-main); z-index: 2;}
+        .status-online { color: var(--success); text-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
+        .status-offline { color: var(--danger); }
+        .chart-container { position: absolute; bottom: 0; left: 0; width: 100%; height: 60px; opacity: 0.3; z-index: 1;}
+        /* Tab Content */
+        .tab-content { display: none; background: var(--bg-card); padding: 25px; border-radius: 12px; border: 1px solid var(--border); animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1); flex: 1; }
+        .tab-content.active { display: flex; flex-direction: column; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* Console */
+        .console-wrapper { background: var(--bg-input); border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; flex: 1; min-height: 400px;}
+        .console-output { padding: 15px; flex: 1; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 14px; color: #a3e635; direction: ltr; text-align: left; line-height: 1.6; }
+        .console-input-area { display: flex; border-top: 1px solid var(--border); background: rgba(255,255,255,0.02);}
         .console-input { flex: 1; background: transparent; border: none; padding: 15px; color: white; font-family: monospace; font-size: 15px; outline: none; }
-        .console-btn { background: #0ea5e9; color: white; border: none; padding: 0 25px; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        .console-btn:hover { background: #0284c7; }
-
-        .action-bar { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
-        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: white; transition: 0.3s; display: inline-flex; align-items: center; gap: 8px; }
-        .btn-green { background: #10b981; } .btn-green:hover { background: #059669; }
-        .btn-red { background: #ef4444; } .btn-red:hover { background: #dc2626; }
-        .btn-blue { background: #3b82f6; } .btn-blue:hover { background: #2563eb; }
-        .btn-orange { background: #f59e0b; } .btn-orange:hover { background: #d97706; }
-
-        .list-item { display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #334155; transition: 0.2s; }
-        .list-item:hover { border-color: #475569; }
-        .list-item-title { font-weight: bold; font-size: 16px; }
+        .console-btn { background: var(--primary); color: white; border: none; padding: 0 30px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .console-btn:hover { background: var(--primary-hover); }
+        /* Buttons & Forms */
+        .action-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: white; transition: 0.3s; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;}
+        .btn-green { background: var(--success); } .btn-green:hover { background: #059669; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);}
+        .btn-red { background: var(--danger); } .btn-red:hover { background: #dc2626; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);}
+        .btn-blue { background: var(--primary); } .btn-blue:hover { background: var(--primary-hover); box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4);}
+        .btn-orange { background: var(--warning); } .btn-orange:hover { background: #d97706; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);}
+        /* Lists */
+        .list-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg-input); padding: 15px 20px; border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border); transition: 0.2s; }
+        .list-item:hover { border-color: #475569; transform: translateX(-5px);}
+        .list-item-title { font-weight: bold; font-size: 16px; display: flex; align-items: center; gap: 10px;}
         .list-actions { display: flex; gap: 8px; }
+        /* Config Grid (The Ultimate Config) */
+        .config-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; max-height: 60vh; overflow-y: auto; padding-right: 10px;}
+        .config-row { display: flex; flex-direction: column; background: var(--bg-input); padding: 15px; border-radius: 8px; border: 1px solid var(--border); transition: 0.3s;}
+        .config-row:focus-within { border-color: var(--primary); box-shadow: 0 0 10px rgba(14, 165, 233, 0.2);}
+        .config-row span { margin-bottom: 8px; font-weight: bold; color: var(--text-main); font-size: 14px; }
+        .config-row select, .config-row input { width: 100%; background: var(--bg-card); color: white; border: 1px solid var(--border); padding: 10px; border-radius: 6px; outline: none; font-weight: bold; transition: 0.3s; }
+        .config-row input:focus, .config-row select:focus { border-color: var(--primary); }
+        /* File Viewer */
+        .file-viewer { background: var(--bg-input); color: #e2e8f0; padding: 20px; border-radius: 8px; font-family: 'Consolas', monospace; white-space: pre-wrap; max-height: 500px; overflow-y: auto; direction: ltr; text-align: left; border: 1px solid var(--border); margin-top: 15px; display: none; font-size: 14px; line-height: 1.5;}
+        /* Toast Notifications */
+        #toast-container { position: fixed; bottom: 20px; left: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+        .toast { background: var(--bg-card); color: white; padding: 15px 25px; border-radius: 8px; border-right: 4px solid var(--primary); box-shadow: 0 10px 25px rgba(0,0,0,0.5); animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards; font-weight: bold; display: flex; align-items: center; gap: 10px;}
 
-        /* تصميم شبكة الإعدادات الاحترافية */
-        .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; }
-        .config-row { display: flex; flex-direction: column; background: #0f172a; padding: 15px; border-radius: 8px; border: 1px solid #334155; }
-        .config-row span { margin-bottom: 8px; font-weight: bold; color: #e2e8f0; font-size: 14px; }
-        .config-row select, .config-row input { width: 100%; background: #1e293b; color: white; border: 1px solid #475569; padding: 10px; border-radius: 6px; outline: none; font-weight: bold; transition: 0.3s; }
-        .config-row input:focus, .config-row select:focus { border-color: #38bdf8; box-shadow: 0 0 8px rgba(56, 189, 248, 0.3); }
-
-        .file-viewer { background: #020617; color: #e2e8f0; padding: 15px; border-radius: 8px; font-family: monospace; white-space: pre-wrap; max-height: 400px; overflow-y: auto; direction: ltr; text-align: left; border: 1px solid #334155; margin-top: 15px; display: none;}
-
+        /* Scrollbars */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-track { background: var(--bg-input); border-radius: 4px;}
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        /* Responsive */
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; flex-direction: row; overflow-x: auto; padding: 10px; border-left: none; border-bottom: 1px solid var(--border); }
+            .sidebar-header { display: none; }
+            .nav-item { padding: 10px 15px; border-right: none; border-bottom: 3px solid transparent; white-space: nowrap;}
+            .nav-item.active { border-right: none; border-bottom-color: var(--primary); }
+            .stats-grid { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
     <div id="toast-container"></div>
-    <div class="container">
-        <div class="header">
-            <h2><span style="font-size: 28px;">🎮</span> لوحة تحكم السيرفر</h2>
+    <!-- Sidebar Navigation -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2>🛡️ Enterprise</h2>
+        </div>
+        <div class="nav-item active" onclick="openTab('console', this)">💻 الكونسول والتحكم</div>
+        <div class="nav-item" onclick="openTab('livemap', this)">🗺️ الخريطة المباشرة</div>
+        <div class="nav-item" onclick="openTab('players', this)">👥 إدارة اللاعبين</div>
+        <div class="nav-item" onclick="openTab('mods', this); loadMods();">🧩 مدير المودات</div>
+        <div class="nav-item" onclick="openTab('files', this); loadFiles();">📁 مدير الملفات</div>
+        <div class="nav-item" onclick="openTab('backups', this); loadBackups();">💾 النسخ الاحتياطي</div>
+        <div class="nav-item" onclick="openTab('settings', this); loadConfig();">⚙️ إعدادات السيرفر</div>
+        <div class="nav-item" onclick="openTab('crashes', this); loadCrash();">⚠️ تقارير الكراش</div>
+    </div>
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Top Header -->
+        <div class="top-header">
             <div id="network-area" class="network-box">
                 <span class="ip-badge ip-connected" id="ip-display">جاري الاتصال...</span>
                 <button class="btn-copy" onclick="copyIP()">📋 نسخ</button>
             </div>
-            <a href="/logout" class="btn-logout">تسجيل خروج</a>
+            <a href="/logout" class="btn-logout">تسجيل خروج 🚪</a>
         </div>
+        <!-- Stats Grid with Live Charts -->
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-title">حالة السيرفر</div>
@@ -454,25 +672,17 @@ DASHBOARD_HTML = """
             <div class="stat-card">
                 <div class="stat-title">استهلاك المعالج (CPU)</div>
                 <div class="stat-value" id="cpu-text">0%</div>
+                <div class="chart-container"><canvas id="cpuChart"></canvas></div>
             </div>
             <div class="stat-card">
                 <div class="stat-title">استهلاك الرام (RAM)</div>
                 <div class="stat-value" id="ram-text">0%</div>
+                <div class="chart-container"><canvas id="ramChart"></canvas></div>
             </div>
             <div class="stat-card">
                 <div class="stat-title">اللاعبين المتصلين</div>
                 <div class="stat-value" id="players-count">0</div>
             </div>
-        </div>
-        <div class="tabs-nav">
-            <button class="tab-btn active" onclick="openTab('console')">الكونسول والتحكم</button>
-            <button class="tab-btn" onclick="openTab('livemap')">🗺️ الخريطة المباشرة</button>
-            <button class="tab-btn" onclick="openTab('players')">إدارة اللاعبين</button>
-            <button class="tab-btn" onclick="openTab('mods'); loadMods();">مدير المودات</button>
-            <button class="tab-btn" onclick="openTab('files'); loadFiles();">مدير الملفات</button>
-            <button class="tab-btn" onclick="openTab('backups'); loadBackups();">النسخ الاحتياطي</button>
-            <button class="tab-btn" onclick="openTab('settings'); loadConfig();">إعدادات السيرفر</button>
-            <button class="tab-btn" onclick="openTab('crashes'); loadCrash();">الكراشات</button>
         </div>
         <!-- 1. Console Tab -->
         <div id="console" class="tab-content active">
@@ -480,6 +690,7 @@ DASHBOARD_HTML = """
                 <button class="btn btn-green" onclick="sendAction('start')">▶ تشغيل السيرفر</button>
                 <button class="btn btn-orange" onclick="sendAction('stop')">⏹ إيقاف آمن (حفظ)</button>
                 <button class="btn btn-red" onclick="sendAction('kill')">💀 إيقاف إجباري</button>
+                <button class="btn btn-blue" onclick="execCmd('!resetworld')" style="margin-right: auto;">💥 فرمتة العالم</button>
             </div>
             <div class="console-wrapper">
                 <div class="console-output" id="console-box"></div>
@@ -490,50 +701,49 @@ DASHBOARD_HTML = """
             </div>
         </div>
         <!-- 2. Live Map Tab -->
-        <div id="livemap" class="tab-content">
-            <h3 style="margin-top:0; color:#38bdf8;">🗺️ الخريطة المباشرة (Live Map)</h3>
-            <p style="color: #94a3b8; font-size: 14px;">لعرض الخريطة، يجب أن تكون قد قمت برفع مود <b>Dynmap</b> إلى مجلد المودات وتشغيل السيرفر.</p>
-            <div class="action-bar" style="margin-bottom: 15px;">
-                <button class="btn btn-blue" onclick="document.getElementById('map-frame').src = '/map/';">🔄 تحديث الخريطة</button>
-                <a href="/map/" target="_blank" class="btn btn-green" style="text-decoration:none;">🌍 فتح في نافذة جديدة</a>
+        <div id="livemap" class="tab-content" style="padding: 0; overflow: hidden; display: none; flex-direction: column;">
+            <div style="padding: 15px; background: var(--bg-card); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin:0; color:var(--primary);">🗺️ الخريطة المباشرة (Dynmap)</h3>
+                <div>
+                    <button class="btn btn-blue" onclick="document.getElementById('map-frame').src = '/map/';">🔄 تحديث</button>
+                    <a href="/map/" target="_blank" class="btn btn-green" style="text-decoration:none;">🌍 فتح بنافذة</a>
+                </div>
             </div>
-            <div style="border: 1px solid #334155; border-radius: 8px; overflow: hidden; height: 60vh;">
-                <iframe id="map-frame" src="/map/" style="width: 100%; height: 100%; border: none; background: #020617;"></iframe>
-            </div>
+            <iframe id="map-frame" src="/map/" style="width: 100%; flex: 1; border: none; background: #000; min-height: 60vh;"></iframe>
         </div>
         <!-- 3. Players Tab -->
         <div id="players" class="tab-content">
-            <h3 style="margin-top:0; color:#38bdf8;">👥 اللاعبين المتصلين حالياً</h3>
-            <div id="players-list"><p style="color: #94a3b8;">جاري التحميل...</p></div>
+            <h3 style="margin-top:0; color:var(--primary);">👥 إدارة اللاعبين المتصلين</h3>
+            <div id="players-list"><p style="color: var(--text-muted);">جاري التحميل...</p></div>
         </div>
         <!-- 4. Mods Tab -->
         <div id="mods" class="tab-content">
-            <h3 style="margin-top:0; color:#38bdf8;">📦 إدارة المودات (Mods)</h3>
-            <div class="action-bar" style="background: #0f172a; padding: 15px; border-radius: 8px; border: 1px dashed #475569;">
-                <input type="file" id="mod-file" accept=".jar" style="color: white;">
+            <h3 style="margin-top:0; color:var(--primary);">📦 مدير المودات (Fabric 1.20.4)</h3>
+            <div class="action-bar" style="background: var(--bg-input); padding: 20px; border-radius: 8px; border: 1px dashed #475569; align-items: center;">
+                <input type="file" id="mod-file" accept=".jar" style="color: white; flex: 1;">
                 <button class="btn btn-green" onclick="uploadMod()">⬆️ رفع المود للسيرفر</button>
             </div>
-            <div id="mods-list" style="margin-top: 20px;">جاري التحميل...</div>
+            <div id="mods-list" style="margin-top: 20px; overflow-y: auto; flex: 1;">جاري التحميل...</div>
         </div>
         <!-- 5. File Manager Tab -->
         <div id="files" class="tab-content">
-            <h3 style="margin-top:0; color:#38bdf8;">📁 مدير ملفات السيرفر (JSON & Logs)</h3>
-            <p style="color: #94a3b8; font-size: 14px;">يمكنك قراءة وحذف ملفات الإعدادات والتقارير من هنا.</p>
-            <div id="files-list">جاري التحميل...</div>
+            <h3 style="margin-top:0; color:var(--primary);">📁 مدير ملفات النظام</h3>
+            <p style="color: var(--text-muted); font-size: 14px;">تصفح، اقرأ، واحذف ملفات الإعدادات والتقارير بأمان.</p>
+            <div id="files-list" style="overflow-y: auto; max-height: 40vh;">جاري التحميل...</div>
             <div id="file-viewer" class="file-viewer"></div>
         </div>
         <!-- 6. Backups Tab -->
         <div id="backups" class="tab-content">
-            <h3 style="margin-top:0; color:#38bdf8;">💾 النسخ الاحتياطي للعالم (World)</h3>
+            <h3 style="margin-top:0; color:var(--primary);">💾 نظام النسخ الاحتياطي (Disaster Recovery)</h3>
             <button class="btn btn-blue" onclick="createBackup()" style="width: 100%; justify-content: center; padding: 15px; font-size: 16px; margin-bottom: 20px;">
-                📦 إنشاء نسخة احتياطية جديدة الآن
+                📦 إنشاء نسخة احتياطية للعالم الآن
             </button>
-            <div id="backups-list">جاري التحميل...</div>
+            <div id="backups-list" style="overflow-y: auto; flex: 1;">جاري التحميل...</div>
         </div>
         <!-- 7. Settings Tab (The Ultimate Config) -->
         <div id="settings" class="tab-content">
-            <h3 style="margin-top:0; color:#38bdf8;">⚙️ إعدادات السيرفر الشاملة (server.properties)</h3>
-            <p style="color: #f59e0b; font-size: 14px; margin-bottom: 20px;">⚠️ ملاحظة: يجب إيقاف السيرفر وتشغيله مرة أخرى لتطبيق أي تعديلات.</p>
+            <h3 style="margin-top:0; color:var(--primary);">⚙️ إعدادات السيرفر الشاملة (server.properties)</h3>
+            <p style="color: var(--warning); font-size: 14px; margin-bottom: 20px;">⚠️ يجب إيقاف السيرفر وتشغيله مرة أخرى لتطبيق أي تعديلات.</p>
             <div id="config-form" class="config-grid">جاري التحميل...</div>
             <button class="btn btn-green" onclick="saveConfig()" style="width: 100%; justify-content: center; padding: 15px; font-size: 18px; margin-top: 20px; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);">
                 💾 حفظ جميع الإعدادات
@@ -541,72 +751,86 @@ DASHBOARD_HTML = """
         </div>
         <!-- 8. Crashes Tab -->
         <div id="crashes" class="tab-content">
-            <h3 style="margin-top:0; color:#ef4444;">⚠️ آخر تقرير كراش (Crash Report)</h3>
-            <div class="console-wrapper">
+            <h3 style="margin-top:0; color:var(--danger);">⚠️ محلل تقارير الكراش (Crash Analyzer)</h3>
+            <div class="console-wrapper" style="flex: 1;">
                 <div class="console-output" id="crash-box" style="color: #fca5a5;">جاري التحميل...</div>
             </div>
         </div>
     </div>
     <script>
-        // قائمة الإعدادات الشاملة
-        const configFields = [
-            {key: 'motd', label: 'رسالة الترحيب (MOTD)', type: 'text'},
-            {key: 'max-players', label: 'أقصى عدد لاعبين', type: 'number'},
-            {key: 'difficulty', label: 'مستوى الصعوبة', type: 'select', options: ['peaceful', 'easy', 'normal', 'hard']},
-            {key: 'pvp', label: 'القتال بين اللاعبين (PVP)', type: 'select', options: ['true', 'false']},
-            {key: 'hardcore', label: 'وضع الهاردكور (موتة وحدة)', type: 'select', options: ['true', 'false']},
-            {key: 'view-distance', label: 'مسافة الرؤية (Chunks)', type: 'number'},
-            {key: 'simulation-distance', label: 'مسافة المحاكاة', type: 'number'},
-            {key: 'level-seed', label: 'سيد العالم (Seed)', type: 'text'},
-            {key: 'allow-nether', label: 'تفعيل النذر (Nether)', type: 'select', options: ['true', 'false']},
-            {key: 'allow-flight', label: 'السماح بالطيران (يمنع الطرد)', type: 'select', options: ['true', 'false']},
-            {key: 'enable-command-block', label: 'تفعيل الكوماند بلوك', type: 'select', options: ['true', 'false']},
-            {key: 'spawn-protection', label: 'حماية نقطة البداية (بلوكات)', type: 'number'},
-            {key: 'white-list', label: 'تفعيل القائمة البيضاء', type: 'select', options: ['true', 'false']},
-            {key: 'force-gamemode', label: 'إجبار وضع اللعب عند الدخول', type: 'select', options: ['true', 'false']},
-            {key: 'max-build-height', label: 'أقصى ارتفاع للبناء', type: 'number'},
-            {key: 'enforce-secure-profile', label: 'تشفير الشات (يفضل False للمكرك)', type: 'select', options: ['true', 'false']},
-            {key: 'spawn-monsters', label: 'ترسبن الوحوش', type: 'select', options: ['true', 'false']},
-            {key: 'spawn-animals', label: 'ترسبن الحيوانات', type: 'select', options: ['true', 'false']},
-            {key: 'spawn-npcs', label: 'ترسبن القرويين (NPCs)', type: 'select', options: ['true', 'false']},
-            {key: 'generate-structures', label: 'توليد القرى والمعابد', type: 'select', options: ['true', 'false']},
-            {key: 'entity-broadcast-range-percentage', label: 'مسافة ظهور الكيانات (%)', type: 'number'},
-            {key: 'sync-chunk-writes', label: 'مزامنة حفظ التشانكات', type: 'select', options: ['true', 'false']},
-            {key: 'rate-limit', label: 'حد الرسايل (Rate Limit)', type: 'number'}
-        ];
+        // --- UI & Toast System ---
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
             toast.className = 'toast';
-            toast.style.borderRightColor = type === 'success' ? '#34d399' : (type === 'error' ? '#ef4444' : '#38bdf8');
-            toast.innerText = message;
+            toast.style.borderRightColor = type === 'success' ? 'var(--success)' : (type === 'error' ? 'var(--danger)' : 'var(--primary)');
+            toast.innerHTML = `<span>${type === 'success' ? '✅' : (type === 'error' ? '❌' : 'ℹ️')}</span> ${message}`;
             container.appendChild(toast);
             setTimeout(() => {
                 toast.style.animation = 'fadeOut 0.3s ease-out forwards';
                 setTimeout(() => toast.remove(), 300);
-            }, 3000);
+            }, 4000);
         }
         function copyIP() {
             const ipText = document.getElementById('ip-display').innerText;
-            navigator.clipboard.writeText(ipText).then(() => {
-                showToast('✅ تم نسخ الآي بي بنجاح!');
-            });
+            navigator.clipboard.writeText(ipText).then(() => showToast('تم نسخ الآي بي بنجاح!'));
         }
         let autoScroll = true;
         let consoleBox = document.getElementById('console-box');
         consoleBox.addEventListener('scroll', () => {
             autoScroll = (consoleBox.scrollHeight - consoleBox.scrollTop - consoleBox.clientHeight < 50);
         });
-        function openTab(tabName) {
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
-            document.getElementById(tabName).classList.add('active');
-            event.currentTarget.classList.add('active');
+        function openTab(tabName, btnElement) {
+            document.querySelectorAll('.tab-content').forEach(t => {
+                t.classList.remove('active');
+                t.style.display = 'none';
+            });
+            document.querySelectorAll('.nav-item').forEach(t => t.classList.remove('active'));
+
+            const targetTab = document.getElementById(tabName);
+            targetTab.classList.add('active');
+            targetTab.style.display = tabName === 'livemap' ? 'flex' : 'block';
+
+            if(btnElement) btnElement.classList.add('active');
         }
+        // --- Live Charts Setup (Chart.js) ---
+        const chartOptions = {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            scales: { x: { display: false }, y: { display: false, min: 0, max: 100 } },
+            elements: { point: { radius: 0 }, line: { tension: 0.4, borderWidth: 2 } }
+        };
+
+        const cpuCtx = document.getElementById('cpuChart').getContext('2d');
+        const cpuChart = new Chart(cpuCtx, {
+            type: 'line',
+            data: { labels: Array(20).fill(''), datasets: [{ data: Array(20).fill(0), borderColor: '#0ea5e9', backgroundColor: 'rgba(14, 165, 233, 0.1)', fill: true }] },
+            options: chartOptions
+        });
+        const ramCtx = document.getElementById('ramChart').getContext('2d');
+        const ramChart = new Chart(ramCtx, {
+            type: 'line',
+            data: { labels: Array(20).fill(''), datasets: [{ data: Array(20).fill(0), borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true }] },
+            options: chartOptions
+        });
+        function updateCharts(cpu, ram) {
+            cpuChart.data.datasets[0].data.push(cpu);
+            cpuChart.data.datasets[0].data.shift();
+            cpuChart.update('none');
+
+            ramChart.data.datasets[0].data.push(ram);
+            ramChart.data.datasets[0].data.shift();
+            ramChart.update('none');
+        }
+        // --- Core Status Loop ---
         function updateStatus() {
-            fetch('/api/status').then(res => res.json()).then(data => {
+            fetch('/api/status').then(res => {
+                if(res.status === 401) window.location.reload();
+                return res.json();
+            }).then(data => {
                 document.getElementById('cpu-text').innerText = data.cpu + '%';
                 document.getElementById('ram-text').innerText = data.ram + '%';
+                updateCharts(data.cpu, data.ram);
                 let statusEl = document.getElementById('status-text');
                 statusEl.innerText = data.status;
                 statusEl.className = data.status.includes('شغال') ? 'stat-value status-online' : 'stat-value status-offline';
@@ -617,23 +841,24 @@ DASHBOARD_HTML = """
                 else ipDisplay.className = 'ip-badge ip-connected';
                 consoleBox.innerHTML = data.logs.join('<br>');
                 if (autoScroll) consoleBox.scrollTop = consoleBox.scrollHeight;
-                let p_html = data.players.length === 0 ? '<p style="color: #94a3b8;">لا يوجد لاعبين متصلين حالياً.</p>' : '';
+                let p_html = data.players.length === 0 ? '<p style="color: var(--text-muted); text-align:center; padding: 20px;">لا يوجد لاعبين متصلين حالياً.</p>' : '';
                 data.players.forEach(p => {
                     p_html += `
                     <div class="list-item">
                         <div class="list-item-title">👤 ${p}</div>
                         <div class="list-actions">
-                            <button class="btn btn-blue" onclick="execCmd('op ${p}')">إعطاء أدمن</button>
-                            <button class="btn btn-green" onclick="execCmd('gamemode creative ${p}')">إبداع</button>
-                            <button class="btn btn-orange" onclick="execCmd('gamemode survival ${p}')">نجاة</button>
-                            <button class="btn btn-red" onclick="execCmd('kick ${p}')">طرد</button>
+                            <button class="btn btn-blue" onclick="execCmd('op ${p}')">👑 أدمن</button>
+                            <button class="btn btn-green" onclick="execCmd('gamemode creative ${p}')">✨ إبداع</button>
+                            <button class="btn btn-orange" onclick="execCmd('gamemode survival ${p}')">❤️ نجاة</button>
+                            <button class="btn btn-red" onclick="execCmd('kick ${p}')">👢 طرد</button>
                         </div>
                     </div>`;
                 });
                 document.getElementById('players-list').innerHTML = p_html;
-            });
+            }).catch(err => console.error("Status fetch error:", err));
         }
         setInterval(updateStatus, 2000);
+        // --- Actions & Commands ---
         function sendCmd() {
             let cmd = document.getElementById('cmd').value;
             if(cmd.trim() === "") return;
@@ -646,13 +871,14 @@ DASHBOARD_HTML = """
         }
         function sendAction(act) {
             if(act === 'kill' && !confirm('تحذير: الإيقاف الإجباري قد يؤدي إلى ضياع آخر التغييرات. متأكد؟')) return;
-            fetch('/api/action', { method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: 'action=' + act }).then(() => {
-                showToast(act === 'start' ? '🚀 جاري التشغيل...' : '🛑 تم إرسال أمر الإيقاف', 'info');
-            });
+            if(act === 'stop') showToast('🛑 تم إرسال أمر الإيقاف الآمن، يرجى الانتظار...', 'info');
+            if(act === 'start') showToast('🚀 جاري تشغيل السيرفر...', 'info');
+            fetch('/api/action', { method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: 'action=' + act });
         }
+        // --- Mods Manager ---
         function loadMods() {
             fetch('/api/mods').then(res => res.json()).then(mods => {
-                let html = mods.length === 0 ? '<p style="color: #94a3b8;">لا توجد مودات مثبتة.</p>' : '';
+                let html = mods.length === 0 ? '<p style="color: var(--text-muted); text-align:center; padding: 20px;">لا توجد مودات مثبتة.</p>' : '';
                 mods.forEach(mod => {
                     html += `
                     <div class="list-item">
@@ -673,7 +899,7 @@ DASHBOARD_HTML = """
             btn.innerText = "⏳ جاري الرفع...";
             btn.disabled = true;
             fetch('/api/mods', { method: 'POST', body: formData }).then(() => {
-                showToast('✅ تم رفع المود بنجاح!');
+                showToast('تم رفع المود بنجاح!');
                 fileInput.value = '';
                 loadMods();
                 btn.innerText = originalText;
@@ -683,13 +909,14 @@ DASHBOARD_HTML = """
         function deleteMod(modName) {
             if(!confirm('هل أنت متأكد من حذف المود: ' + modName + '؟')) return;
             fetch('/api/mods', { method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: 'delete=' + encodeURIComponent(modName) }).then(() => {
-                showToast('🗑️ تم الحذف بنجاح!');
+                showToast('تم الحذف بنجاح!');
                 loadMods();
             });
         }
+        // --- File Manager ---
         function loadFiles() {
             fetch('/api/files').then(res => res.json()).then(files => {
-                let html = files.length === 0 ? '<p style="color: #94a3b8;">لا توجد ملفات.</p>' : '';
+                let html = files.length === 0 ? '<p style="color: var(--text-muted); text-align:center; padding: 20px;">لا توجد ملفات.</p>' : '';
                 files.forEach(f => {
                     html += `
                     <div class="list-item">
@@ -720,14 +947,15 @@ DASHBOARD_HTML = """
             formData.append('action', 'delete');
             formData.append('target', filename);
             fetch('/api/files', { method: 'POST', body: formData }).then(() => {
-                showToast('🗑️ تم الحذف بنجاح!');
+                showToast('تم الحذف بنجاح!');
                 document.getElementById('file-viewer').style.display = 'none';
                 loadFiles();
             });
         }
+        // --- Backups ---
         function loadBackups() {
             fetch('/api/backup').then(res => res.json()).then(backups => {
-                let html = backups.length === 0 ? '<p style="color: #94a3b8;">لا توجد نسخ احتياطية.</p>' : '';
+                let html = backups.length === 0 ? '<p style="color: var(--text-muted); text-align:center; padding: 20px;">لا توجد نسخ احتياطية.</p>' : '';
                 backups.forEach(b => {
                     html += `
                     <div class="list-item">
@@ -740,22 +968,26 @@ DASHBOARD_HTML = """
         }
         function createBackup() {
             fetch('/api/backup', { method: 'POST' }).then(() => {
-                showToast('⏳ بدأ إنشاء النسخة الاحتياطية...', 'info');
+                showToast('بدأ إنشاء النسخة الاحتياطية...', 'info');
                 setTimeout(loadBackups, 5000);
             });
         }
+        // --- The Ultimate Config Manager ---
         function loadConfig() {
             fetch('/api/config').then(res => res.json()).then(data => {
                 let html = '';
-                configFields.forEach(f => {
-                    let val = data[f.key] || '';
-                    html += `<div class="config-row"><span>${f.label}</span>`;
+                const schema = data.schema;
+                const values = data.values;
+
+                schema.forEach(f => {
+                    let val = values[f.key] !== undefined ? values[f.key] : f.default;
+                    html += `<div class="config-row"><span>${f.label} <small style="color:var(--text-muted); font-weight:normal;">(${f.key})</small></span>`;
                     if(f.type === 'select') {
-                        html += `<select id="cfg-${f.key}">`;
+                        html += `<select id="cfg-${f.key}" data-key="${f.key}">`;
                         f.options.forEach(opt => { html += `<option value="${opt}" ${val===opt?'selected':''}>${opt}</option>`; });
                         html += `</select></div>`;
                     } else {
-                        html += `<input type="${f.type}" id="cfg-${f.key}" value="${val}"></div>`;
+                        html += `<input type="${f.type}" id="cfg-${f.key}" data-key="${f.key}" value="${val}"></div>`;
                     }
                 });
                 document.getElementById('config-form').innerHTML = html;
@@ -763,19 +995,19 @@ DASHBOARD_HTML = """
         }
         function saveConfig() {
             let data = {};
-            configFields.forEach(f => {
-                let el = document.getElementById('cfg-' + f.key);
-                if(el && el.value.trim() !== '') {
-                    data[f.key] = el.value;
+            document.querySelectorAll('#config-form input, #config-form select').forEach(el => {
+                if(el.value.trim() !== '') {
+                    data[el.getAttribute('data-key')] = el.value;
                 }
             });
             fetch('/api/config', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) }).then(() => {
-                showToast('💾 تم حفظ الإعدادات! أعد تشغيل السيرفر لتطبيقها.');
+                showToast('تم حفظ جميع الإعدادات! أعد تشغيل السيرفر لتطبيقها.');
             });
         }
+        // --- Crash Analyzer ---
         function loadCrash() {
             fetch('/api/crash').then(res => res.text()).then(text => {
-                document.getElementById('crash-box').innerText = text;
+                document.getElementById('crash-box').innerHTML = text;
             });
         }
     </script>
