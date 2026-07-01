@@ -445,30 +445,6 @@ def login():
 def logout():
     session.clear()
     return redirect('/')
-# 🗺️ الوكيل العكسي الشامل للخريطة المباشرة (Dynmap Reverse Proxy)
-@app.route('/map/')
-@app.route('/map/<path:subpath>')
-@app.route('/up/<path:subpath>')
-@app.route('/tiles/<path:subpath>')
-@app.route('/js/<path:subpath>')
-@app.route('/css/<path:subpath>')
-@app.route('/images/<path:subpath>')
-@app.route('/standalone/<path:subpath>')
-def map_proxy(subpath=''):
-    req_path = request.path
-    if req_path.startswith('/map/'): req_path = req_path.replace('/map/', '/', 1)
-    elif req_path == '/map': req_path = '/'
-    target_url = f"http://127.0.0.1:8123{req_path}"
-    if request.query_string: target_url += f"?{request.query_string.decode('utf-8')}"
-    try:
-        req = requests.get(target_url, stream=True, timeout=5)
-        excluded_headers = ['content-encoding', 'content-length', 'transfer-encoding', 'connection']
-        headers = [(name, value) for (name, value) in req.headers.items() if name.lower() not in excluded_headers]
-        return Response(req.iter_content(chunk_size=10*1024), req.status_code, headers)
-    except Exception as e:
-        if request.path.startswith('/map'):
-            return f"<div style='color:#94a3b8; text-align:center; padding:50px; font-family:sans-serif;'><h3>الخريطة غير متصلة 🔴</h3><p>تأكد من تشغيل السيرفر وكتابة أمر <b>dynmap fullrender world</b> في الكونسول.</p></div>", 502
-        return "Not found", 404
 @app.route('/api/status')
 def status():
     return jsonify({
@@ -735,7 +711,6 @@ DASHBOARD_HTML = """
             <h2>🛡️ Enterprise</h2>
         </div>
         <div class="nav-item active" onclick="openTab('console', this)">💻 الكونسول والتحكم</div>
-        <div class="nav-item" onclick="openTab('livemap', this)">🗺️ الخريطة المباشرة</div>
         <div class="nav-item" onclick="openTab('players', this)">👥 إدارة اللاعبين</div>
         <div class="nav-item" onclick="openTab('mods', this); loadMods();">🧩 مدير المودات</div>
         <div class="nav-item" onclick="openTab('files', this); loadFiles();">📁 مدير الملفات</div>
@@ -789,17 +764,6 @@ DASHBOARD_HTML = """
                     <button class="console-btn" onclick="sendCmd()">إرسال</button>
                 </div>
             </div>
-        </div>
-        <!-- 2. Live Map Tab -->
-        <div id="livemap" class="tab-content" style="padding: 0; overflow: hidden; display: none; flex-direction: column;">
-            <div style="padding: 15px; background: var(--bg-card); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                <h3 style="margin:0; color:var(--primary);">🗺️ الخريطة المباشرة (Dynmap)</h3>
-                <div>
-                    <button class="btn btn-blue" onclick="document.getElementById('map-frame').src = '/map/';">🔄 تحديث</button>
-                    <a href="/map/" target="_blank" class="btn btn-green" style="text-decoration:none;">🌍 فتح بنافذة</a>
-                </div>
-            </div>
-            <iframe id="map-frame" src="/map/" style="width: 100%; flex: 1; border: none; background: #000; min-height: 60vh;"></iframe>
         </div>
         <!-- 3. Players Tab -->
         <div id="players" class="tab-content">
