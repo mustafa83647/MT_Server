@@ -278,14 +278,36 @@ class MinecraftDaemon:
                     if f == 'server.properties': file.write("online-mode=false\n")
                     elif f.endswith('.json'): file.write("[]\n")
         with open(os.path.join(DATA_DIR, "eula.txt"), 'w') as f: f.write("eula=true\n")
+
         # تحميل وتثبيت Fabric مباشرة في التخزين الدائم
         fabric_jar = os.path.join(DATA_DIR, "fabric-server-launch.jar")
-        if not os.path.exists(fabric_jar):
-            self.logger.log("النظام", "⬇️ جاري تحميل محرك Fabric (1.20.4)...", is_safe=True)
-            installer_path = os.path.join(DATA_DIR, "fabric-installer.jar")
-            subprocess.run(["wget", "-q", "-O", installer_path, "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.jar"])
-            subprocess.run(["java", "-jar", "fabric-installer.jar", "server", "-mcversion", "1.20.4", "-loader", "0.15.7", "-downloadMinecraft"], cwd=DATA_DIR)
-            if os.path.exists(installer_path): os.remove(installer_path)
+
+        # إذا كان الملف غير موجود، أو حجمه تالف (أقل من 10 كيلوبايت)
+        if not os.path.exists(fabric_jar) or os.path.getsize(fabric_jar) < 10240:
+            if os.path.exists(fabric_jar):
+                os.remove(fabric_jar)
+
+            # تنظيف أي مخلفات قديمة تالفة لضمان تثبيت نظيف
+            for item in ["libraries", "server.jar"]:
+                path = os.path.join(DATA_DIR, item)
+                if os.path.exists(path):
+                    if os.path.isdir(path): shutil.rmtree(path)
+                    else: os.remove(path)
+
+            self.logger.log("النظام", "⬇️ جاري تحميل محرك Fabric (1.20.4) مباشرة من خوادم Fabric الرسمية...", is_safe=True)
+            # تحميل ملف التشغيل المباشر (Bootstrap Jar) من الـ API الرسمي للفابريك
+            fabric_url = "https://meta.fabricmc.net/v2/versions/loader/1.20.4/0.15.7/1.0.1/server/jar"
+            try:
+                response = requests.get(fabric_url, timeout=30)
+                if response.status_code == 200:
+                    with open(fabric_jar, 'wb') as f:
+                        f.write(response.content)
+                    self.logger.log("النظام", "✅ تم تحميل ملف تشغيل Fabric بنجاح.", is_safe=True)
+                else:
+                    self.logger.log("النظام", f"❌ فشل تحميل Fabric: رمز الحالة {response.status_code}", is_safe=True)
+            except Exception as e:
+                self.logger.log("النظام", f"❌ فشل تحميل Fabric بسبب خطأ في الشبكة: {e}", is_safe=True)
+
         self.logger.log("النظام", "✅ تمت التهيئة بنجاح. البيئة جاهزة.", is_safe=True)
     def start_async(self):
         if self.is_running(): return
