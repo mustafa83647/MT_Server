@@ -38,9 +38,8 @@ from werkzeug.utils import secure_filename
 # =========================================================================================
 # 1. CORE CONFIGURATION & CONSTANTS
 # =========================================================================================
-# مسارات النظام الأساسية
+# مسارات النظام الأساسية (تم توجيه كل شيء للتخزين الدائم مباشرة لمنع ضياع البيانات)
 DATA_DIR = "/data/minecraft_data"
-APP_DIR = "/app/minecraft"
 # إعدادات الأمان
 PASSWORD = os.environ.get("PANEL_PASSWORD", "2938")
 FLASK_SECRET = os.environ.get("FLASK_SECRET", os.urandom(64)) # تشفير 64 بايت معقد
@@ -246,7 +245,6 @@ class BackupManager:
             os.makedirs(self.backup_dir, exist_ok=True)
             timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
             backup_path = os.path.join(self.backup_dir, f"world_backup_{timestamp}")
-
             # استخدام shutil لضغط المجلد
             shutil.make_archive(backup_path, 'zip', self.world_dir)
             self.logger.log("Backup", f"✅ اكتملت النسخة الاحتياطية بنجاح: world_backup_{timestamp}.zip", is_safe=True)
@@ -266,38 +264,27 @@ class MinecraftDaemon:
         self.online_players = set()
         self.thread = None
         self.intentional_stop = False # لمعرفة هل الإيقاف مقصود أم كراش
-    def force_symlink(self, src: str, dst: str):
-        try:
-            if os.path.islink(dst) or os.path.isfile(dst): os.remove(dst)
-            elif os.path.isdir(dst): shutil.rmtree(dst)
-            os.symlink(src, dst)
-        except Exception as e:
-            self.logger.log("النظام", f"⚠️ تحذير أثناء ربط {os.path.basename(dst)}: {html.escape(str(e))}", is_safe=True)
     def setup_environment(self):
-        self.logger.log("النظام", "🛠️ جاري تهيئة بيئة السيرفر (Enterprise Secure Mode)...", is_safe=True)
-        # إنشاء المجلدات
+        self.logger.log("النظام", "🛠️ جاري تهيئة بيئة السيرفر مباشرة في التخزين الدائم...", is_safe=True)
+        # إنشاء المجلدات مباشرة في التخزين الدائم
         for d in ['world', 'mods', 'config', 'backups', 'logs', 'crash-reports']:
             os.makedirs(os.path.join(DATA_DIR, d), exist_ok=True)
-        os.makedirs(APP_DIR, exist_ok=True)
-        # ربط العالم
-        self.force_symlink(os.path.join(DATA_DIR, "world"), os.path.join(APP_DIR, "world"))
-        # إنشاء وربط الملفات
-        files_to_link = ['server.properties', 'ops.json', 'banned-players.json', 'banned-ips.json', 'whitelist.json', 'usercache.json']
-        for f in files_to_link:
+        # إنشاء الملفات الأساسية مباشرة في التخزين الدائم
+        files_to_create = ['server.properties', 'ops.json', 'banned-players.json', 'banned-ips.json', 'whitelist.json', 'usercache.json']
+        for f in files_to_create:
             file_path = os.path.join(DATA_DIR, f)
             if not os.path.exists(file_path):
                 with open(file_path, 'w') as file:
                     if f == 'server.properties': file.write("online-mode=false\n")
                     elif f.endswith('.json'): file.write("[]\n")
-            self.force_symlink(file_path, os.path.join(APP_DIR, f))
-        with open(os.path.join(APP_DIR, "eula.txt"), 'w') as f: f.write("eula=true\n")
-        # تحميل Fabric
-        fabric_jar = os.path.join(APP_DIR, "fabric-server-launch.jar")
+        with open(os.path.join(DATA_DIR, "eula.txt"), 'w') as f: f.write("eula=true\n")
+        # تحميل وتثبيت Fabric مباشرة في التخزين الدائم
+        fabric_jar = os.path.join(DATA_DIR, "fabric-server-launch.jar")
         if not os.path.exists(fabric_jar):
             self.logger.log("النظام", "⬇️ جاري تحميل محرك Fabric (1.20.4)...", is_safe=True)
-            installer_path = os.path.join(APP_DIR, "fabric-installer.jar")
+            installer_path = os.path.join(DATA_DIR, "fabric-installer.jar")
             subprocess.run(["wget", "-q", "-O", installer_path, "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.jar"])
-            subprocess.run(["java", "-jar", "fabric-installer.jar", "server", "-mcversion", "1.20.4", "-loader", "0.15.7", "-downloadMinecraft"], cwd=APP_DIR)
+            subprocess.run(["java", "-jar", "fabric-installer.jar", "server", "-mcversion", "1.20.4", "-loader", "0.15.7", "-downloadMinecraft"], cwd=DATA_DIR)
             if os.path.exists(installer_path): os.remove(installer_path)
         self.logger.log("النظام", "✅ تمت التهيئة بنجاح. البيئة جاهزة.", is_safe=True)
     def start_async(self):
@@ -325,7 +312,7 @@ class MinecraftDaemon:
         self.logger.log("Minecraft", "🚀 جاري إطلاق السيرفر مع تحسينات الأداء (Aikar's Flags)...", is_safe=True)
         try:
             self.process = subprocess.Popen(
-                java_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE, text=True, bufsize=1, cwd=APP_DIR
+                java_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE, text=True, bufsize=1, cwd=DATA_DIR
             )
             for line in self.process.stdout:
                 clean_line = ANSI_ESCAPE.sub('', line.strip())
@@ -339,7 +326,6 @@ class MinecraftDaemon:
                 if leave_match and html.escape(leave_match.group(1)) in self.online_players:
                     self.online_players.remove(html.escape(leave_match.group(1)))
             self.process.wait() # انتظار انتهاء العملية
-
             if not self.intentional_stop:
                 self.logger.log("Minecraft", "⚠️ السيرفر توقف بشكل غير متوقع (Crash)!", is_safe=True)
             else:
@@ -381,7 +367,6 @@ class WatchdogDaemon:
     def _run(self):
         while True:
             time.sleep(WATCHDOG_CHECK_INTERVAL)
-
             # 1. Auto-Restart Logic
             # إذا كان السيرفر متوقفاً، ولم يكن الإيقاف مقصوداً (يعني كراش)
             if not self.mc_server.is_running() and not self.mc_server.intentional_stop:
@@ -493,12 +478,10 @@ def action():
 def send_command():
     cmd = request.form.get('cmd')
     if not cmd: return "Bad Request", 400
-
     if cmd.strip() == "!resetworld":
         shutil.rmtree(os.path.join(DATA_DIR, "world"), ignore_errors=True)
         logger_mgr.log("النظام", "💥 تم فرمتة العالم القديم بنجاح! أوقف السيرفر وشغله من جديد لتوليد عالم بالسيد الجديد.", is_safe=True)
         return "OK"
-
     mc_server.send_command(cmd)
     return "OK"
 @app.route('/api/mods', methods=['GET', 'POST'])
@@ -580,7 +563,7 @@ def file_manager():
     return jsonify(file_list)
 @app.route('/api/crash')
 def get_crash():
-    crash_dir = os.path.join(APP_DIR, "crash-reports")
+    crash_dir = os.path.join(DATA_DIR, "crash-reports")
     if not os.path.exists(crash_dir): return "لا توجد كراشات."
     crashes = sorted([f for f in os.listdir(crash_dir) if f.endswith('.txt')], reverse=True)
     if not crashes: return "السيرفر مستقر، لا توجد تقارير كراش."
