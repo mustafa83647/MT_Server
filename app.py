@@ -294,11 +294,8 @@ class MinecraftDaemon:
         # تحميل Fabric
         fabric_jar = os.path.join(APP_DIR, "fabric-server-launch.jar")
         if not os.path.exists(fabric_jar):
-            self.logger.log("النظام", "⬇️ جاري تحميل محرك Fabric (1.20.4)...", is_safe=True)
-            installer_path = os.path.join(APP_DIR, "fabric-installer.jar")
-            subprocess.run(["wget", "-q", "-O", installer_path, "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.jar"])
-            subprocess.run(["java", "-jar", "fabric-installer.jar", "server", "-mcversion", "1.20.4", "-loader", "0.15.7", "-downloadMinecraft"], cwd=APP_DIR)
-            if os.path.exists(installer_path): os.remove(installer_path)
+            self.logger.log("النظام", "⬇️ جاري تحميل محرك Fabric (1.20.4) المباشر...", is_safe=True)
+            subprocess.run(["wget", "-q", "-O", fabric_jar, "https://meta.fabricmc.net/v2/versions/loader/1.20.4/0.15.7/1.0.1/server/jar"])
         self.logger.log("النظام", "✅ تمت التهيئة بنجاح. البيئة جاهزة.", is_safe=True)
     def start_async(self):
         if self.is_running(): return
