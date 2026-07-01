@@ -293,9 +293,6 @@ class MinecraftDaemon:
         with open(os.path.join(APP_DIR, "eula.txt"), 'w') as f: f.write("eula=true\n")
         # تحميل Fabric
         fabric_jar = os.path.join(APP_DIR, "fabric-server-launch.jar")
-        if not os.path.exists(fabric_jar):
-            self.logger.log("النظام", "⬇️ جاري تحميل محرك Fabric (1.20.4) المباشر...", is_safe=True)
-            subprocess.run(["wget", "-q", "-O", fabric_jar, "https://meta.fabricmc.net/v2/versions/loader/1.20.4/0.15.7/1.0.1/server/jar"])
         self.logger.log("النظام", "✅ تمت التهيئة بنجاح. البيئة جاهزة.", is_safe=True)
     def start_async(self):
         if self.is_running(): return
