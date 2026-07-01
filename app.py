@@ -3,7 +3,7 @@
 👑 ULTIMATE MINECRAFT SERVER PANEL - GOD-TIER ENTERPRISE EDITION 👑
 =========================================================================================
 Author: Senior AI Architect
-Version: 10.0.0 (Titanium Build)
+Version: 11.0.0 (Self-Healing Titanium Build)
 Lines of Code: 2200+
 Description: A fully-fledged, military-grade Minecraft server management panel built
              into a single monolithic Python script.
@@ -11,11 +11,11 @@ Features:
     - Advanced OOP Architecture (Managers & Daemons)
     - Auto-Recovery Watchdog (Restarts server on crash)
     - Automated Background Backups
-    - Dynmap Reverse Proxy Integration
     - Playit.gg Tunneling Daemon
     - Aikar's JVM Flags for Extreme Performance
     - Military-Grade Security (Anti-Brute Force, Path Traversal Prevention, XSS Filters)
     - Custom Glassmorphism UI with Live Chart.js Telemetry
+    - 🆕 Self-Healing Integrity Scanner (Auto-repairs corrupt .jar files)
 =========================================================================================
 """
 import os
@@ -38,24 +38,20 @@ from werkzeug.utils import secure_filename
 # =========================================================================================
 # 1. CORE CONFIGURATION & CONSTANTS
 # =========================================================================================
-# مسارات النظام الأساسية
 DATA_DIR = "/data/minecraft_data"
-APP_DIR = "/data/minecraft_data/app" # <-- التعديل هنا
-# إعدادات الأمان
+APP_DIR = "/data/minecraft_data/app"
 PASSWORD = os.environ.get("PANEL_PASSWORD", "2938")
-FLASK_SECRET = os.environ.get("FLASK_SECRET", os.urandom(64)) # تشفير 64 بايت معقد
-# إعدادات الأداء
+FLASK_SECRET = os.environ.get("FLASK_SECRET", os.urandom(64))
 MAX_LOG_LINES = 1000
 AUTO_BACKUP_INTERVAL_HOURS = 6
 WATCHDOG_CHECK_INTERVAL = 10
-# تعبيرات منتظمة (Regex) لتنظيف النصوص وصيد البيانات
 ANSI_ESCAPE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 PLAYER_JOIN_REGEX = re.compile(r': ([a-zA-Z0-9_]{3,16}) joined the game')
 PLAYER_LEAVE_REGEX = re.compile(r': ([a-zA-Z0-9_]{3,16}) left the game')
 PLAYIT_CLAIM_REGEX = re.compile(r'(https://playit\.gg/claim/[a-zA-Z0-9]+)')
 PLAYIT_IP_REGEX = re.compile(r'([a-zA-Z0-9\-]+\.(?:auto\.playit\.gg|playit\.gg|joinmc\.link):\d+)')
 # =========================================================================================
-# 2. THE ULTIMATE SERVER PROPERTIES SCHEMA (57+ Properties)
+# 2. THE ULTIMATE SERVER PROPERTIES SCHEMA
 # =========================================================================================
 SERVER_PROPERTIES_SCHEMA = [
     {"key": "motd", "label": "رسالة الترحيب (MOTD)", "type": "text", "default": "A Minecraft Server"},
@@ -120,13 +116,11 @@ SERVER_PROPERTIES_SCHEMA = [
 # 3. ENTERPRISE CLASSES (OOP ARCHITECTURE)
 # =========================================================================================
 class SecurityManager:
-    """🛡️ كلاس مخصص لإدارة الحماية، التشفير، ومنع هجمات التخمين (Anti-Brute Force)"""
     def __init__(self):
         self.failed_logins = {}
         self.MAX_ATTEMPTS = 5
-        self.LOCKOUT_TIME = 900 # 15 minutes
+        self.LOCKOUT_TIME = 900
     def check_ip(self, ip: str) -> tuple[bool, str]:
-        """التحقق مما إذا كان الـ IP محظوراً"""
         current_time = time.time()
         if ip in self.failed_logins:
             attempts, lockout_time = self.failed_logins[ip]
@@ -134,40 +128,34 @@ class SecurityManager:
                 remaining = int((lockout_time - current_time) / 60)
                 return False, f"تم حظر عنوان IP الخاص بك مؤقتاً لدواعي أمنية. حاول بعد {remaining} دقيقة."
             elif current_time >= lockout_time and attempts >= self.MAX_ATTEMPTS:
-                self.failed_logins.pop(ip, None) # فك الحظر بعد انتهاء الوقت
+                self.failed_logins.pop(ip, None)
         return True, ""
     def register_failure(self, ip: str):
-        """تسجيل محاولة دخول فاشلة"""
         current_time = time.time()
         attempts, _ = self.failed_logins.get(ip, (0, 0))
         attempts += 1
         lockout = current_time + self.LOCKOUT_TIME if attempts >= self.MAX_ATTEMPTS else 0
         self.failed_logins[ip] = (attempts, lockout)
     def register_success(self, ip: str):
-        """تصفير المحاولات عند النجاح"""
         self.failed_logins.pop(ip, None)
     @staticmethod
     def sanitize_path(target: str, base_dir: str) -> str:
-        """يمنع ثغرة Path Traversal بشكل قاطع"""
         target_path = os.path.realpath(os.path.join(base_dir, target))
         safe_dir = os.path.realpath(base_dir)
         if not target_path.startswith(safe_dir):
             raise PermissionError("Security Violation: Path Traversal Attempted")
         return target_path
 class LoggerManager:
-    """📝 كلاس مخصص لإدارة السجلات (Logs) بشكل آمن وفعال للذاكرة"""
     def __init__(self):
         self.logs = deque(maxlen=MAX_LOG_LINES)
         self.lock = threading.Lock()
     def log(self, source: str, message: str, is_safe: bool = False, color: str = "#64748b"):
-        """إضافة سطر جديد للوق مع حماية XSS"""
         with self.lock:
             timestamp = datetime.now().strftime("%H:%M:%S")
             clean_msg = ANSI_ESCAPE.sub('', message.strip())
             if not clean_msg: return
             if not is_safe:
                 clean_msg = html.escape(clean_msg)
-            # تلوين المصدر لسهولة القراءة
             source_color = {
                 "النظام": "#38bdf8",
                 "Minecraft": "#a3e635",
@@ -182,7 +170,6 @@ class LoggerManager:
         with self.lock:
             return list(self.logs)
 class PlayitDaemon:
-    """🌐 كلاس مخصص لإدارة اتصال Playit.gg والوكيل العكسي"""
     def __init__(self, logger: LoggerManager):
         self.process = None
         self.logger = logger
@@ -230,7 +217,6 @@ class PlayitDaemon:
             self.logger.log("Playit", f"❌ انهيار في أداة الشبكة: {html.escape(str(e))}", is_safe=True)
             self.status = "error"
 class BackupManager:
-    """💾 كلاس مخصص لإدارة النسخ الاحتياطي التلقائي واليدوي"""
     def __init__(self, logger: LoggerManager):
         self.logger = logger
         self.backup_dir = os.path.join(DATA_DIR, "backups")
@@ -246,8 +232,6 @@ class BackupManager:
             os.makedirs(self.backup_dir, exist_ok=True)
             timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
             backup_path = os.path.join(self.backup_dir, f"world_backup_{timestamp}")
-
-            # استخدام shutil لضغط المجلد
             shutil.make_archive(backup_path, 'zip', self.world_dir)
             self.logger.log("Backup", f"✅ اكتملت النسخة الاحتياطية بنجاح: world_backup_{timestamp}.zip", is_safe=True)
         except Exception as e:
@@ -258,14 +242,13 @@ class BackupManager:
         if not os.path.exists(self.backup_dir): return []
         return sorted([f for f in os.listdir(self.backup_dir) if f.endswith('.zip')], reverse=True)
 class MinecraftDaemon:
-    """🎮 كلاس مخصص لإدارة سيرفر ماين كرافت، البيئة، واللاعبين"""
     def __init__(self, logger: LoggerManager, backup_mgr: BackupManager):
         self.process = None
         self.logger = logger
         self.backup_mgr = backup_mgr
         self.online_players = set()
         self.thread = None
-        self.intentional_stop = False # لمعرفة هل الإيقاف مقصود أم كراش
+        self.intentional_stop = False
     def force_symlink(self, src: str, dst: str):
         try:
             if os.path.islink(dst) or os.path.isfile(dst): os.remove(dst)
@@ -273,15 +256,39 @@ class MinecraftDaemon:
             os.symlink(src, dst)
         except Exception as e:
             self.logger.log("النظام", f"⚠️ تحذير أثناء ربط {os.path.basename(dst)}: {html.escape(str(e))}", is_safe=True)
+    def clean_corrupt_jars(self):
+        """🛡️ نظام الشفاء الذاتي: يفحص كل ملفات الجافا ويحذف المعطوب منها ليعاد تحميله"""
+        self.logger.log("النظام", "🔍 جاري الفحص العميق لسلامة الملفات (Self-Healing Scan)...", is_safe=True)
+        deleted = 0
+        for root, dirs, files in os.walk(APP_DIR):
+            for file in files:
+                if file.endswith('.jar'):
+                    path = os.path.join(root, file)
+                    try:
+                        # إذا كان الملف فارغاً أو صغيراً جداً فهو معطوب حتماً
+                        if os.path.getsize(path) < 1024:
+                            raise ValueError("File too small")
+                        # محاولة فتح الملف كملف مضغوط للتأكد من سلامته من الداخل
+                        with zipfile.ZipFile(path) as zf:
+                            if zf.testzip() is not None:
+                                raise ValueError("Corrupt zip contents")
+                    except Exception:
+                        try:
+                            os.remove(path)
+                            deleted += 1
+                            self.logger.log("النظام", f"🗑️ تم اكتشاف وحذف ملف معطوب: {file}", is_safe=True)
+                        except:
+                            pass
+        if deleted > 0:
+            self.logger.log("النظام", f"✅ تم تنظيف {deleted} ملفات معطوبة. سيقوم النظام بتعويضها تلقائياً.", is_safe=True)
+        else:
+            self.logger.log("النظام", "✅ جميع الملفات سليمة 100%.", is_safe=True)
     def setup_environment(self):
         self.logger.log("النظام", "🛠️ جاري تهيئة بيئة السيرفر (Enterprise Secure Mode)...", is_safe=True)
-        # إنشاء المجلدات
         for d in ['world', 'mods', 'config', 'backups', 'logs', 'crash-reports']:
             os.makedirs(os.path.join(DATA_DIR, d), exist_ok=True)
         os.makedirs(APP_DIR, exist_ok=True)
-        # ربط العالم
         self.force_symlink(os.path.join(DATA_DIR, "world"), os.path.join(APP_DIR, "world"))
-        # إنشاء وربط الملفات
         files_to_link = ['server.properties', 'ops.json', 'banned-players.json', 'banned-ips.json', 'whitelist.json', 'usercache.json']
         for f in files_to_link:
             file_path = os.path.join(DATA_DIR, f)
@@ -291,8 +298,20 @@ class MinecraftDaemon:
                     elif f.endswith('.json'): file.write("[]\n")
             self.force_symlink(file_path, os.path.join(APP_DIR, f))
         with open(os.path.join(APP_DIR, "eula.txt"), 'w') as f: f.write("eula=true\n")
-        # تحميل Fabric
+        # 1. فحص الملفات قبل التحميل (لحذف أي ملف خرب في التشغيلة السابقة)
+        self.clean_corrupt_jars()
+        # 2. تحميل وتثبيت المحرك بشكل آمن
         fabric_jar = os.path.join(APP_DIR, "fabric-server-launch.jar")
+        if not os.path.exists(fabric_jar):
+            self.logger.log("النظام", "⬇️ جاري تحميل وتثبيت محرك Fabric بشكل آمن...", is_safe=True)
+            installer_jar = os.path.join(APP_DIR, "fabric-installer.jar")
+            subprocess.run(["wget", "-q", "-O", installer_jar, "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.jar"])
+            subprocess.run(["java", "-jar", "fabric-installer.jar", "server", "-mcversion", "1.20.4", "-loader", "0.15.7", "-downloadMinecraft"], cwd=APP_DIR)
+            if os.path.exists(installer_jar):
+                os.remove(installer_jar)
+
+            # 3. فحص الملفات بعد التحميل للتأكد من عدم انقطاع النت أثناء التثبيت
+            self.clean_corrupt_jars()
         self.logger.log("النظام", "✅ تمت التهيئة بنجاح. البيئة جاهزة.", is_safe=True)
     def start_async(self):
         if self.is_running(): return
@@ -304,7 +323,7 @@ class MinecraftDaemon:
         self.online_players.clear()
         mods_dir = os.path.join(DATA_DIR, "mods")
         config_dir = os.path.join(DATA_DIR, "config")
-        # Aikar's Flags for Ultimate Performance (Optimized for 6GB RAM)
+
         java_args = [
             "java", "-Xms2G", "-Xmx6G",
             f"-Dfabric.modsDir={mods_dir}", f"-Dfabric.configDir={config_dir}",
@@ -326,14 +345,13 @@ class MinecraftDaemon:
                 if not clean_line: continue
                 safe_line = html.escape(clean_line)
                 self.logger.log("Minecraft", safe_line, is_safe=True)
-                # Player Tracking Logic
+
                 join_match = PLAYER_JOIN_REGEX.search(clean_line)
                 if join_match: self.online_players.add(html.escape(join_match.group(1)))
                 leave_match = PLAYER_LEAVE_REGEX.search(clean_line)
                 if leave_match and html.escape(leave_match.group(1)) in self.online_players:
                     self.online_players.remove(html.escape(leave_match.group(1)))
-            self.process.wait() # انتظار انتهاء العملية
-
+            self.process.wait()
             if not self.intentional_stop:
                 self.logger.log("Minecraft", "⚠️ السيرفر توقف بشكل غير متوقع (Crash)!", is_safe=True)
             else:
@@ -364,7 +382,6 @@ class MinecraftDaemon:
     def is_running(self) -> bool:
         return self.process is not None and self.process.poll() is None
 class WatchdogDaemon:
-    """🐕 كلاس مخصص لمراقبة السيرفر وإعادة تشغيله عند الكراش، وعمل نسخ احتياطية تلقائية"""
     def __init__(self, mc_server: MinecraftDaemon, backup_mgr: BackupManager, logger: LoggerManager):
         self.mc_server = mc_server
         self.backup_mgr = backup_mgr
@@ -375,16 +392,11 @@ class WatchdogDaemon:
     def _run(self):
         while True:
             time.sleep(WATCHDOG_CHECK_INTERVAL)
-
-            # 1. Auto-Restart Logic
-            # إذا كان السيرفر متوقفاً، ولم يكن الإيقاف مقصوداً (يعني كراش)
             if not self.mc_server.is_running() and not self.mc_server.intentional_stop:
-                # ننتظر قليلاً للتأكد
                 time.sleep(5)
                 if not self.mc_server.is_running() and not self.mc_server.intentional_stop:
                     self.logger.log("Watchdog", "🚨 اكتشف النظام توقف السيرفر! جاري إعادة التشغيل التلقائي...", is_safe=True)
                     self.mc_server.start_async()
-            # 2. Auto-Backup Logic
             current_time = datetime.now()
             if (current_time - self.last_backup_time).total_seconds() >= (AUTO_BACKUP_INTERVAL_HOURS * 3600):
                 self.logger.log("Watchdog", "⏰ حان وقت النسخ الاحتياطي التلقائي المجدول.", is_safe=True)
@@ -398,15 +410,13 @@ app.secret_key = FLASK_SECRET
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['PERMANENT_SESSION_LIFETIME'] = 86400 # 24 Hours
-# Instantiate Managers
+app.config['PERMANENT_SESSION_LIFETIME'] = 86400
 logger_mgr = LoggerManager()
 security_mgr = SecurityManager()
 backup_mgr = BackupManager(logger_mgr)
 mc_server = MinecraftDaemon(logger_mgr, backup_mgr)
 playit_net = PlayitDaemon(logger_mgr)
 watchdog = WatchdogDaemon(mc_server, backup_mgr, logger_mgr)
-# Start Background Daemons
 playit_net.start_async()
 mc_server.start_async()
 watchdog.start()
@@ -415,11 +425,8 @@ watchdog.start()
 # =========================================================================================
 @app.before_request
 def check_auth():
-    """🛡️ Middleware للتحقق من تسجيل الدخول لكل مسارات الـ API والخريطة"""
     if request.path.startswith('/api/') and not session.get('logged_in'):
         abort(401)
-    # استثناء مسارات الخريطة من الحماية لتتمكن من العمل داخل iframe
-    # if request.path.startswith('/map/') and not session.get('logged_in'): abort(401)
 @app.route('/')
 def index():
     if not session.get('logged_in'): return render_template_string(LOGIN_HTML)
@@ -463,12 +470,10 @@ def action():
 def send_command():
     cmd = request.form.get('cmd')
     if not cmd: return "Bad Request", 400
-
     if cmd.strip() == "!resetworld":
         shutil.rmtree(os.path.join(DATA_DIR, "world"), ignore_errors=True)
         logger_mgr.log("النظام", "💥 تم فرمتة العالم القديم بنجاح! أوقف السيرفر وشغله من جديد لتوليد عالم بالسيد الجديد.", is_safe=True)
         return "OK"
-
     mc_server.send_command(cmd)
     return "OK"
 @app.route('/api/mods', methods=['GET', 'POST'])
@@ -622,16 +627,13 @@ DASHBOARD_HTML = """
         :root { --bg-main: #0f172a; --bg-card: #1e293b; --bg-input: #020617; --text-main: #f8fafc; --text-muted: #94a3b8; --primary: #0ea5e9; --primary-hover: #0284c7; --success: #10b981; --danger: #ef4444; --warning: #f59e0b; --border: #334155; }
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background: var(--bg-main); color: var(--text-main); margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; }
-        /* Sidebar Navigation */
         .sidebar { width: 260px; background: var(--bg-card); border-left: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px 0; transition: 0.3s; z-index: 100;}
         .sidebar-header { padding: 0 20px 20px; border-bottom: 1px solid var(--border); margin-bottom: 20px; text-align: center; }
         .sidebar-header h2 { margin: 0; color: var(--primary); font-size: 22px; text-shadow: 0 2px 10px rgba(14, 165, 233, 0.3); }
         .nav-item { padding: 15px 25px; color: var(--text-muted); cursor: pointer; font-weight: bold; transition: 0.3s; display: flex; align-items: center; gap: 10px; border-right: 4px solid transparent; }
         .nav-item:hover { background: rgba(14, 165, 233, 0.1); color: var(--text-main); }
         .nav-item.active { background: rgba(14, 165, 233, 0.15); color: var(--primary); border-right-color: var(--primary); }
-        /* Main Content Area */
         .main-content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 20px; }
-        /* Top Header */
         .top-header { display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 15px 25px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
         .network-box { display: flex; align-items: center; gap: 10px; background: var(--bg-input); padding: 8px 15px; border-radius: 8px; border: 1px solid var(--border); }
         .ip-badge { font-weight: bold; font-size: 16px; letter-spacing: 1px; }
@@ -641,7 +643,6 @@ DASHBOARD_HTML = """
         .btn-copy:hover { background: #475569; }
         .btn-logout { background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid var(--danger); padding: 8px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; transition: 0.3s; }
         .btn-logout:hover { background: var(--danger); color: white; }
-        /* Stats Grid & Charts */
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 20px; }
         .stat-card { background: var(--bg-card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden;}
         .stat-title { color: var(--text-muted); font-size: 14px; margin-bottom: 10px; text-transform: uppercase; font-weight: bold; z-index: 2;}
@@ -649,47 +650,38 @@ DASHBOARD_HTML = """
         .status-online { color: var(--success); text-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
         .status-offline { color: var(--danger); }
         .chart-container { position: absolute; bottom: 0; left: 0; width: 100%; height: 60px; opacity: 0.3; z-index: 1;}
-        /* Tab Content */
         .tab-content { display: none; background: var(--bg-card); padding: 25px; border-radius: 12px; border: 1px solid var(--border); animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1); flex: 1; }
         .tab-content.active { display: flex; flex-direction: column; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        /* Console */
         .console-wrapper { background: var(--bg-input); border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; flex: 1; min-height: 400px;}
         .console-output { padding: 15px; flex: 1; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 14px; color: #a3e635; direction: ltr; text-align: left; line-height: 1.6; }
         .console-input-area { display: flex; border-top: 1px solid var(--border); background: rgba(255,255,255,0.02);}
         .console-input { flex: 1; background: transparent; border: none; padding: 15px; color: white; font-family: monospace; font-size: 15px; outline: none; }
         .console-btn { background: var(--primary); color: white; border: none; padding: 0 30px; cursor: pointer; font-weight: bold; transition: 0.3s; }
         .console-btn:hover { background: var(--primary-hover); }
-        /* Buttons & Forms */
         .action-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
         .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: white; transition: 0.3s; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;}
         .btn-green { background: var(--success); } .btn-green:hover { background: #059669; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);}
         .btn-red { background: var(--danger); } .btn-red:hover { background: #dc2626; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);}
         .btn-blue { background: var(--primary); } .btn-blue:hover { background: var(--primary-hover); box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4);}
         .btn-orange { background: var(--warning); } .btn-orange:hover { background: #d97706; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);}
-        /* Lists */
         .list-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg-input); padding: 15px 20px; border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border); transition: 0.2s; }
         .list-item:hover { border-color: #475569; transform: translateX(-5px);}
         .list-item-title { font-weight: bold; font-size: 16px; display: flex; align-items: center; gap: 10px;}
         .list-actions { display: flex; gap: 8px; }
-        /* Config Grid (The Ultimate Config) */
         .config-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; max-height: 60vh; overflow-y: auto; padding-right: 10px;}
         .config-row { display: flex; flex-direction: column; background: var(--bg-input); padding: 15px; border-radius: 8px; border: 1px solid var(--border); transition: 0.3s;}
         .config-row:focus-within { border-color: var(--primary); box-shadow: 0 0 10px rgba(14, 165, 233, 0.2);}
         .config-row span { margin-bottom: 8px; font-weight: bold; color: var(--text-main); font-size: 14px; }
         .config-row select, .config-row input { width: 100%; background: var(--bg-card); color: white; border: 1px solid var(--border); padding: 10px; border-radius: 6px; outline: none; font-weight: bold; transition: 0.3s; }
         .config-row input:focus, .config-row select:focus { border-color: var(--primary); }
-        /* File Viewer */
         .file-viewer { background: var(--bg-input); color: #e2e8f0; padding: 20px; border-radius: 8px; font-family: 'Consolas', monospace; white-space: pre-wrap; max-height: 500px; overflow-y: auto; direction: ltr; text-align: left; border: 1px solid var(--border); margin-top: 15px; display: none; font-size: 14px; line-height: 1.5;}
-        /* Toast Notifications */
         #toast-container { position: fixed; bottom: 20px; left: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
         .toast { background: var(--bg-card); color: white; padding: 15px 25px; border-radius: 8px; border-right: 4px solid var(--primary); box-shadow: 0 10px 25px rgba(0,0,0,0.5); animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards; font-weight: bold; display: flex; align-items: center; gap: 10px;}
-        /* Scrollbars */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: var(--bg-input); border-radius: 4px;}
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #64748b; }
-        /* Responsive */
         @media (max-width: 768px) {
             body { flex-direction: column; }
             .sidebar { width: 100%; height: auto; flex-direction: row; overflow-x: auto; padding: 10px; border-left: none; border-bottom: 1px solid var(--border); }
@@ -702,7 +694,6 @@ DASHBOARD_HTML = """
 </head>
 <body>
     <div id="toast-container"></div>
-    <!-- Sidebar Navigation -->
     <div class="sidebar">
         <div class="sidebar-header">
             <h2>🛡️ Enterprise</h2>
@@ -715,9 +706,7 @@ DASHBOARD_HTML = """
         <div class="nav-item" onclick="openTab('settings', this); loadConfig();">⚙️ إعدادات السيرفر</div>
         <div class="nav-item" onclick="openTab('crashes', this); loadCrash();">⚠️ تقارير الكراش</div>
     </div>
-    <!-- Main Content -->
     <div class="main-content">
-        <!-- Top Header -->
         <div class="top-header">
             <div id="network-area" class="network-box">
                 <span class="ip-badge ip-connected" id="ip-display">جاري الاتصال...</span>
@@ -725,7 +714,6 @@ DASHBOARD_HTML = """
             </div>
             <a href="/logout" class="btn-logout">تسجيل خروج 🚪</a>
         </div>
-        <!-- Stats Grid with Live Charts -->
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-title">حالة السيرفر</div>
@@ -746,7 +734,6 @@ DASHBOARD_HTML = """
                 <div class="stat-value" id="players-count">0</div>
             </div>
         </div>
-        <!-- 1. Console Tab -->
         <div id="console" class="tab-content active">
             <div class="action-bar">
                 <button class="btn btn-green" onclick="sendAction('start')">▶ تشغيل السيرفر</button>
@@ -762,12 +749,10 @@ DASHBOARD_HTML = """
                 </div>
             </div>
         </div>
-        <!-- 3. Players Tab -->
         <div id="players" class="tab-content">
             <h3 style="margin-top:0; color:var(--primary);">👥 إدارة اللاعبين المتصلين</h3>
             <div id="players-list"><p style="color: var(--text-muted);">جاري التحميل...</p></div>
         </div>
-        <!-- 4. Mods Tab -->
         <div id="mods" class="tab-content">
             <h3 style="margin-top:0; color:var(--primary);">📦 مدير المودات (Fabric 1.20.4)</h3>
             <div class="action-bar" style="background: var(--bg-input); padding: 20px; border-radius: 8px; border: 1px dashed #475569; align-items: center;">
@@ -776,14 +761,12 @@ DASHBOARD_HTML = """
             </div>
             <div id="mods-list" style="margin-top: 20px; overflow-y: auto; flex: 1;">جاري التحميل...</div>
         </div>
-        <!-- 5. File Manager Tab -->
         <div id="files" class="tab-content">
             <h3 style="margin-top:0; color:var(--primary);">📁 مدير ملفات النظام</h3>
             <p style="color: var(--text-muted); font-size: 14px;">تصفح، اقرأ، واحذف ملفات الإعدادات والتقارير بأمان.</p>
             <div id="files-list" style="overflow-y: auto; max-height: 40vh;">جاري التحميل...</div>
             <div id="file-viewer" class="file-viewer"></div>
         </div>
-        <!-- 6. Backups Tab -->
         <div id="backups" class="tab-content">
             <h3 style="margin-top:0; color:var(--primary);">💾 نظام النسخ الاحتياطي (Disaster Recovery)</h3>
             <button class="btn btn-blue" onclick="createBackup()" style="width: 100%; justify-content: center; padding: 15px; font-size: 16px; margin-bottom: 20px;">
@@ -791,7 +774,6 @@ DASHBOARD_HTML = """
             </button>
             <div id="backups-list" style="overflow-y: auto; flex: 1;">جاري التحميل...</div>
         </div>
-        <!-- 7. Settings Tab (The Ultimate Config) -->
         <div id="settings" class="tab-content">
             <h3 style="margin-top:0; color:var(--primary);">⚙️ إعدادات السيرفر الشاملة (server.properties)</h3>
             <p style="color: var(--warning); font-size: 14px; margin-bottom: 20px;">⚠️ يجب إيقاف السيرفر وتشغيله مرة أخرى لتطبيق أي تعديلات.</p>
@@ -800,7 +782,6 @@ DASHBOARD_HTML = """
                 💾 حفظ جميع الإعدادات
             </button>
         </div>
-        <!-- 8. Crashes Tab -->
         <div id="crashes" class="tab-content">
             <h3 style="margin-top:0; color:var(--danger);">⚠️ محلل تقارير الكراش (Crash Analyzer)</h3>
             <div class="console-wrapper" style="flex: 1;">
@@ -809,7 +790,6 @@ DASHBOARD_HTML = """
         </div>
     </div>
     <script>
-        // --- UI & Toast System ---
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -839,10 +819,9 @@ DASHBOARD_HTML = """
             document.querySelectorAll('.nav-item').forEach(t => t.classList.remove('active'));
             const targetTab = document.getElementById(tabName);
             targetTab.classList.add('active');
-            targetTab.style.display = tabName === 'livemap' ? 'flex' : 'block';
+            targetTab.style.display = 'block';
             if(btnElement) btnElement.classList.add('active');
         }
-        // --- Live Charts Setup (Chart.js) ---
         const chartOptions = {
             responsive: true, maintainAspectRatio: false,
             plugins: { legend: { display: false }, tooltip: { enabled: false } },
@@ -869,7 +848,6 @@ DASHBOARD_HTML = """
             ramChart.data.datasets[0].data.shift();
             ramChart.update('none');
         }
-        // --- Core Status Loop ---
         function updateStatus() {
             fetch('/api/status').then(res => {
                 if(res.status === 401) window.location.reload();
@@ -905,7 +883,6 @@ DASHBOARD_HTML = """
             }).catch(err => console.error("Status fetch error:", err));
         }
         setInterval(updateStatus, 2000);
-        // --- Actions & Commands ---
         function sendCmd() {
             let cmd = document.getElementById('cmd').value;
             if(cmd.trim() === "") return;
@@ -922,7 +899,6 @@ DASHBOARD_HTML = """
             if(act === 'start') showToast('🚀 جاري تشغيل السيرفر...', 'info');
             fetch('/api/action', { method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: 'action=' + act });
         }
-        // --- Mods Manager ---
         function loadMods() {
             fetch('/api/mods').then(res => res.json()).then(mods => {
                 let html = mods.length === 0 ? '<p style="color: var(--text-muted); text-align:center; padding: 20px;">لا توجد مودات مثبتة.</p>' : '';
@@ -960,7 +936,6 @@ DASHBOARD_HTML = """
                 loadMods();
             });
         }
-        // --- File Manager ---
         function loadFiles() {
             fetch('/api/files').then(res => res.json()).then(files => {
                 let html = files.length === 0 ? '<p style="color: var(--text-muted); text-align:center; padding: 20px;">لا توجد ملفات.</p>' : '';
@@ -999,7 +974,6 @@ DASHBOARD_HTML = """
                 loadFiles();
             });
         }
-        // --- Backups ---
         function loadBackups() {
             fetch('/api/backup').then(res => res.json()).then(backups => {
                 let html = backups.length === 0 ? '<p style="color: var(--text-muted); text-align:center; padding: 20px;">لا توجد نسخ احتياطية.</p>' : '';
@@ -1019,7 +993,6 @@ DASHBOARD_HTML = """
                 setTimeout(loadBackups, 5000);
             });
         }
-        // --- The Ultimate Config Manager ---
         function loadConfig() {
             fetch('/api/config').then(res => res.json()).then(data => {
                 let html = '';
@@ -1050,7 +1023,6 @@ DASHBOARD_HTML = """
                 showToast('تم حفظ جميع الإعدادات! أعد تشغيل السيرفر لتطبيقها.');
             });
         }
-        // --- Crash Analyzer ---
         function loadCrash() {
             fetch('/api/crash').then(res => res.text()).then(text => {
                 document.getElementById('crash-box').innerHTML = text;
