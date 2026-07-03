@@ -225,25 +225,30 @@ class MinecraftDaemon:
     def _run(self):
         self.setup_environment()
         self.online_players.clear()
-        # 💡 الحل الجذري لمشكلة المودات:
-        # Fabric يتجاهل الأوامر الخارجية ويرفض أن يكون مجلد mods اختصاراً.
-        # الحل: نصنع مجلد حقيقي، ونضع بداخله اختصارات للمودات فقط!
+        # 💡 الحل السحري والنهائي لكسر نظام XetHub الخاص بـ Hugging Face:
+        # بدلاً من عمل اختصارات، سنقوم بـ "نسخ فيزيائي" للملفات.
+        # البايثون سيجبر النظام على تحميل الملف الحقيقي (Hydration) ووضعه في الذاكرة السريعة.
         real_mods_dir = os.path.join(APP_DIR, "mods")
         data_mods_dir = os.path.join(DATA_DIR, "mods")
         os.makedirs(real_mods_dir, exist_ok=True)
-        # تنظيف المجلد من الروابط القديمة
+        # تنظيف الذاكرة السريعة من المودات القديمة
         for f in os.listdir(real_mods_dir):
             file_path = os.path.join(real_mods_dir, f)
-            if os.path.islink(file_path) or os.path.isfile(file_path):
+            if os.path.isfile(file_path) or os.path.islink(file_path):
                 os.remove(file_path)
-        # ربط كل مود موجود في البوكت إلى المجلد الحقيقي
-        for f in os.listdir(data_mods_dir):
-            if f.endswith('.jar'):
-                os.symlink(os.path.join(data_mods_dir, f), os.path.join(real_mods_dir, f))
+        # النسخ الفيزيائي للمودات (فك شفرة xet)
+        if os.path.exists(data_mods_dir):
+            for f in os.listdir(data_mods_dir):
+                if f.endswith('.jar'):
+                    src = os.path.join(data_mods_dir, f)
+                    dst = os.path.join(real_mods_dir, f)
+                    self.logger.log("النظام", f"📦 جاري استخراج المود للذاكرة السريعة: {f}", is_safe=True)
+                    shutil.copy2(src, dst) # هذا السطر هو اللي يكسر الـ xet ويجيب الملف الأصلي
         config_dir = os.path.join(DATA_DIR, "config")
-        # تشغيل الجافا بدون أمر المودات الخارجي (لأنه لا يعمل)
+        # تشغيل الجافا وتوجيهها للمجلد الحقيقي النظيف
         java_args = [
             "java", "-Xms2G", "-Xmx5G",
+            f"-Dfabric.modsDir={real_mods_dir}",
             f"-Dfabric.configDir={config_dir}",
             "-XX:+UseG1GC", "-XX:+ParallelRefProcEnabled", "-XX:MaxGCPauseMillis=200",
             "-XX:+UnlockExperimentalVMOptions", "-XX:+DisableExplicitGC", "-XX:+AlwaysPreTouch",
@@ -253,7 +258,7 @@ class MinecraftDaemon:
             "-XX:G1RSetUpdatingPauseTimePercent=5", "-XX:SurvivorRatio=32", "-XX:+PerfDisableSharedMem",
             "-XX:MaxTenuringThreshold=1", "-jar", "fabric-server-launch.jar", "nogui"
         ]
-        self.logger.log("Minecraft", "🚀 جاري إطلاق السيرفر وقراءة المودات...", is_safe=True)
+        self.logger.log("Minecraft", "🚀 جاري إطلاق السيرفر وقراءة المودات الحقيقية...", is_safe=True)
         try:
             self.process = subprocess.Popen(
                 java_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE, text=True, bufsize=1, cwd=APP_DIR
