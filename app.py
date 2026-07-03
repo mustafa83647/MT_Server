@@ -225,13 +225,26 @@ class MinecraftDaemon:
     def _run(self):
         self.setup_environment()
         self.online_players.clear()
-        mods_dir = os.path.join(DATA_DIR, "mods")
+        # 💡 الحل الجذري لمشكلة المودات:
+        # Fabric يتجاهل الأوامر الخارجية ويرفض أن يكون مجلد mods اختصاراً.
+        # الحل: نصنع مجلد حقيقي، ونضع بداخله اختصارات للمودات فقط!
+        real_mods_dir = os.path.join(APP_DIR, "mods")
+        data_mods_dir = os.path.join(DATA_DIR, "mods")
+        os.makedirs(real_mods_dir, exist_ok=True)
+        # تنظيف المجلد من الروابط القديمة
+        for f in os.listdir(real_mods_dir):
+            file_path = os.path.join(real_mods_dir, f)
+            if os.path.islink(file_path) or os.path.isfile(file_path):
+                os.remove(file_path)
+        # ربط كل مود موجود في البوكت إلى المجلد الحقيقي
+        for f in os.listdir(data_mods_dir):
+            if f.endswith('.jar'):
+                os.symlink(os.path.join(data_mods_dir, f), os.path.join(real_mods_dir, f))
         config_dir = os.path.join(DATA_DIR, "config")
-
-        # تم تقليل الرام إلى 5 جيجا لضمان استقرار النظام وعدم قتله من قبل Hugging Face
+        # تشغيل الجافا بدون أمر المودات الخارجي (لأنه لا يعمل)
         java_args = [
             "java", "-Xms2G", "-Xmx5G",
-            f"-Dfabric.modsDir={mods_dir}", f"-Dfabric.configDir={config_dir}",
+            f"-Dfabric.configDir={config_dir}",
             "-XX:+UseG1GC", "-XX:+ParallelRefProcEnabled", "-XX:MaxGCPauseMillis=200",
             "-XX:+UnlockExperimentalVMOptions", "-XX:+DisableExplicitGC", "-XX:+AlwaysPreTouch",
             "-XX:G1NewSizePercent=30", "-XX:G1MaxNewSizePercent=40", "-XX:G1HeapRegionSize=8M",
@@ -240,7 +253,7 @@ class MinecraftDaemon:
             "-XX:G1RSetUpdatingPauseTimePercent=5", "-XX:SurvivorRatio=32", "-XX:+PerfDisableSharedMem",
             "-XX:MaxTenuringThreshold=1", "-jar", "fabric-server-launch.jar", "nogui"
         ]
-        self.logger.log("Minecraft", "🚀 جاري إطلاق السيرفر مع تحسينات الأداء (Aikar's Flags)...", is_safe=True)
+        self.logger.log("Minecraft", "🚀 جاري إطلاق السيرفر وقراءة المودات...", is_safe=True)
         try:
             self.process = subprocess.Popen(
                 java_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE, text=True, bufsize=1, cwd=APP_DIR
@@ -250,7 +263,6 @@ class MinecraftDaemon:
                 if not clean_line: continue
                 safe_line = html.escape(clean_line)
                 self.logger.log("Minecraft", safe_line, is_safe=True)
-
                 join_match = PLAYER_JOIN_REGEX.search(clean_line)
                 if join_match: self.online_players.add(html.escape(join_match.group(1)))
                 leave_match = PLAYER_LEAVE_REGEX.search(clean_line)
