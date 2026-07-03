@@ -409,13 +409,37 @@ def action():
 def send_command():
     cmd = request.form.get('cmd')
     if not cmd: return "Bad Request", 400
+    # 💥 الأمر السري لمسح العالم
     if cmd.strip() == "!resetworld":
         shutil.rmtree(os.path.join(DATA_DIR, "world"), ignore_errors=True)
         logger_mgr.log("النظام", "💥 تم فرمتة العالم القديم بنجاح! أوقف السيرفر وشغله من جديد لتوليد عالم بالسيد الجديد.", is_safe=True)
         return "OK"
+    # 🚀 الأمر السري الجديد: تحميل المودات برابط مباشر (لتجاوز تلف ملفات Hugging Face)
+    if cmd.strip().startswith("!installmod "):
+        url = cmd.strip().split(" ", 1)[1]
+        def download_mod():
+            try:
+                logger_mgr.log("النظام", f"⬇️ جاري تحميل المود من الرابط المباشر...", is_safe=True)
+                mods_dir = os.path.join(DATA_DIR, "mods")
+                os.makedirs(mods_dir, exist_ok=True)
+
+                # استخراج اسم الملف من الرابط
+                filename = url.split("/")[-1]
+                if not filename.endswith(".jar"): filename = "downloaded_mod.jar"
+                filepath = os.path.join(mods_dir, filename)
+                # التحميل المباشر
+                response = requests.get(url, stream=True)
+                response.raise_for_status()
+                with open(filepath, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+                logger_mgr.log("النظام", f"✅ تم تثبيت المود بنجاح: {filename} (يرجى إعادة تشغيل السيرفر)", is_safe=True)
+            except Exception as e:
+                logger_mgr.log("النظام", f"❌ فشل تحميل المود: {e}", is_safe=True)
+        threading.Thread(target=download_mod, daemon=True).start()
+        return "OK"
     mc_server.send_command(cmd)
     return "OK"
-@app.route('/api/mods', methods=['GET', 'POST'])
 def handle_mods():
     mods_path = os.path.join(DATA_DIR, "mods")
     if request.method == 'POST':
