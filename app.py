@@ -245,6 +245,19 @@ class MinecraftDaemon:
                     dst = os.path.join(real_mods_dir, f)
                     self.logger.log("النظام", f"📦 جاري استخراج المود للذاكرة السريعة: {f}", is_safe=True)
                     shutil.copy2(src, dst) # هذا السطر هو اللي يكسر الـ xet ويجيب الملف الأصلي
+             # --- كاسر حماية WorldEdit للملفات ---
+        schem_dir = os.path.join(DATA_DIR, "config", "worldedit", "schematics")
+        if os.path.exists(schem_dir):
+            for f in os.listdir(schem_dir):
+                if f.endswith('.schem') or f.endswith('.schematic'):
+                    filepath = os.path.join(schem_dir, f)
+                    try:
+                        with open(filepath, 'rb') as file: data = file.read()
+                        os.remove(filepath)
+                        with open(filepath, 'wb') as file: file.write(data)
+                        self.logger.log("النظام", f"🛠️ تم تجهيز ملف البيت للعمل: {f}", is_safe=True)
+                    except: pass
+        # ------------------------------------
         config_dir = os.path.join(DATA_DIR, "config")
         # تشغيل الجافا وتوجيهها للمجلد الحقيقي النظيف
         java_args = [
