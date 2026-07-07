@@ -445,6 +445,7 @@ def send_command():
         return "OK"
     mc_server.send_command(cmd)
     return "OK"
+@app.route('/api/mods', methods=['GET', 'POST']) # <--- هذا السطر الناقص اللي يحل المشكلة!
 def handle_mods():
     mods_path = os.path.join(DATA_DIR, "mods")
     if request.method == 'POST':
