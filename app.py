@@ -3,8 +3,8 @@
 👑 ULTIMATE MINECRAFT SERVER PANEL - GOD-TIER ENTERPRISE EDITION 👑
 =========================================================================================
 Author: Senior AI Architect
-Version: 10.1.0 (Stable Titanium Build)
-Description: Fixed Self-Healing aggressive deletion & Optimized RAM allocation.
+Version: 11.0.0 (Titanium Build - WorldEdit Bypass Engine)
+Description: Features a Bidirectional Physical Sync Engine to bypass Java Canonical Path Security.
 =========================================================================================
 """
 import os
@@ -30,7 +30,7 @@ from werkzeug.utils import secure_filename
 DATA_DIR = "/data/minecraft_data"
 APP_DIR = "/app/minecraft"
 PASSWORD = os.environ.get("PANEL_PASSWORD", "2938")
-FLASK_SECRET = os.environ.get("FLASK_SECRET", os.urandom(64))
+FLASK_SECRET = os.environ.get("FLASK_SECRET", f"enterprise-secret-{PASSWORD}")
 MAX_LOG_LINES = 1000
 AUTO_BACKUP_INTERVAL_HOURS = 6
 WATCHDOG_CHECK_INTERVAL = 10
@@ -66,6 +66,21 @@ SERVER_PROPERTIES_SCHEMA = [
 # =========================================================================================
 # 3. ENTERPRISE CLASSES (OOP ARCHITECTURE)
 # =========================================================================================
+class LoggerManager:
+    def __init__(self):
+        self.logs = deque(maxlen=MAX_LOG_LINES)
+        self.lock = threading.Lock()
+    def log(self, source: str, message: str, is_safe: bool = False, color: str = "#64748b"):
+        with self.lock:
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            clean_msg = ANSI_ESCAPE.sub('', message.strip())
+            if not clean_msg: return
+            if not is_safe: clean_msg = html.escape(clean_msg)
+            source_color = {"النظام": "#38bdf8", "Minecraft": "#a3e635", "Playit": "#f59e0b", "أنت": "#f472b6", "Watchdog": "#ef4444", "Backup": "#8b5cf6"}.get(source, color)
+            formatted_msg = f"<span style='color:#64748b;'>[{timestamp}]</span> <b style='color:{source_color};'>[{source}]</b> {clean_msg}"
+            self.logs.append(formatted_msg)
+    def get_logs(self) -> list:
+        with self.lock: return list(self.logs)
 class SecurityManager:
     def __init__(self):
         self.failed_logins = {}
@@ -96,21 +111,39 @@ class SecurityManager:
         if not target_path.startswith(safe_dir):
             raise PermissionError("Security Violation: Path Traversal Attempted")
         return target_path
-class LoggerManager:
-    def __init__(self):
-        self.logs = deque(maxlen=MAX_LOG_LINES)
-        self.lock = threading.Lock()
-    def log(self, source: str, message: str, is_safe: bool = False, color: str = "#64748b"):
-        with self.lock:
-            timestamp = datetime.now().strftime("%H:%M:%S")
-            clean_msg = ANSI_ESCAPE.sub('', message.strip())
-            if not clean_msg: return
-            if not is_safe: clean_msg = html.escape(clean_msg)
-            source_color = {"النظام": "#38bdf8", "Minecraft": "#a3e635", "Playit": "#f59e0b", "أنت": "#f472b6", "Watchdog": "#ef4444", "Backup": "#8b5cf6"}.get(source, color)
-            formatted_msg = f"<span style='color:#64748b;'>[{timestamp}]</span> <b style='color:{source_color};'>[{source}]</b> {clean_msg}"
-            self.logs.append(formatted_msg)
-    def get_logs(self) -> list:
-        with self.lock: return list(self.logs)
+class EnterpriseStorageManager:
+    """
+    🔥 المحرك السري: نظام المزامنة الفيزيائية ثنائية الاتجاه 🔥
+    هذا الكلاس يكسر حماية الجافا (Canonical Path) الخاصة بـ WorldEdit
+    عن طريق إلغاء الـ Symlinks ونسخ الملفات فيزيائياً للذاكرة السريعة.
+    """
+    def __init__(self, logger: LoggerManager):
+        self.logger = logger
+        self.data_config = os.path.join(DATA_DIR, "config")
+        self.app_config = os.path.join(APP_DIR, "config")
+    def hydrate_to_ram(self):
+        self.logger.log("النظام", "🔄 جاري تفعيل محرك المزامنة الفيزيائية لكسر حماية WorldEdit...", is_safe=True)
+        os.makedirs(self.data_config, exist_ok=True)
+
+        # تدمير أي Symlink قديم يسبب المشكلة
+        if os.path.islink(self.app_config):
+            os.remove(self.app_config)
+        elif os.path.exists(self.app_config):
+            shutil.rmtree(self.app_config)
+
+        # النسخ الفيزيائي العميق (Deep Physical Copy)
+        try:
+            shutil.copytree(self.data_config, self.app_config, dirs_exist_ok=True)
+            self.logger.log("النظام", "✅ تم بناء الملفات الفيزيائية بنجاح. WorldEdit الآن أعمى عن الـ Bucket!", is_safe=True)
+        except Exception as e:
+            self.logger.log("النظام", f"❌ خطأ في المزامنة الفيزيائية: {e}", is_safe=True)
+    def dehydrate_to_disk(self):
+        # مزامنة عكسية لحفظ أي بيت جديد تبنيه أو إعدادات تتغير
+        if os.path.exists(self.app_config):
+            try:
+                shutil.copytree(self.app_config, self.data_config, dirs_exist_ok=True)
+            except:
+                pass
 class PlayitDaemon:
     def __init__(self, logger: LoggerManager):
         self.process = None
@@ -174,10 +207,11 @@ class BackupManager:
         if not os.path.exists(self.backup_dir): return []
         return sorted([f for f in os.listdir(self.backup_dir) if f.endswith('.zip')], reverse=True)
 class MinecraftDaemon:
-    def __init__(self, logger: LoggerManager, backup_mgr: BackupManager):
+    def __init__(self, logger: LoggerManager, backup_mgr: BackupManager, storage_mgr: EnterpriseStorageManager):
         self.process = None
         self.logger = logger
         self.backup_mgr = backup_mgr
+        self.storage_mgr = storage_mgr
         self.online_players = set()
         self.thread = None
         self.intentional_stop = False
@@ -188,16 +222,16 @@ class MinecraftDaemon:
             os.symlink(src, dst)
         except Exception as e:
             self.logger.log("النظام", f"⚠️ تحذير أثناء ربط {os.path.basename(dst)}: {html.escape(str(e))}", is_safe=True)
-
     def setup_environment(self):
         self.logger.log("النظام", "🛠️ جاري تهيئة بيئة السيرفر (Enterprise Secure Mode)...", is_safe=True)
+
+        # إنشاء المجلدات الأساسية في الـ Bucket
         for d in ['world', 'mods', 'config', 'backups', 'logs', 'crash-reports']:
             os.makedirs(os.path.join(DATA_DIR, d), exist_ok=True)
         os.makedirs(APP_DIR, exist_ok=True)
-
+        # ربط العالم فقط (لأن ماين كرافت العادية ما بيها حماية WorldEdit)
         self.force_symlink(os.path.join(DATA_DIR, "world"), os.path.join(APP_DIR, "world"))
-        self.force_symlink(os.path.join(DATA_DIR, "config"), os.path.join(APP_DIR, "config"))
-        
+        # ربط ملفات الإعدادات الأساسية
         files_to_link = ['server.properties', 'ops.json', 'banned-players.json', 'banned-ips.json', 'whitelist.json', 'usercache.json']
         for f in files_to_link:
             file_path = os.path.join(DATA_DIR, f)
@@ -206,10 +240,8 @@ class MinecraftDaemon:
                     if f == 'server.properties': file.write("online-mode=false\n")
                     elif f.endswith('.json'): file.write("[]\n")
             self.force_symlink(file_path, os.path.join(APP_DIR, f))
-
         with open(os.path.join(APP_DIR, "eula.txt"), 'w') as f: f.write("eula=true\n")
-
-        # تحميل Fabric بشكل آمن (بدون حذفه لاحقاً)
+        # تحميل Fabric
         fabric_jar = os.path.join(APP_DIR, "fabric-server-launch.jar")
         if not os.path.exists(fabric_jar):
             self.logger.log("النظام", "⬇️ جاري تحميل وتثبيت محرك Fabric (1.20.4)...", is_safe=True)
@@ -217,6 +249,10 @@ class MinecraftDaemon:
             subprocess.run(["wget", "-q", "-O", installer_path, "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.jar"])
             subprocess.run(["java", "-jar", "fabric-installer.jar", "server", "-mcversion", "1.20.4", "-loader", "0.15.7", "-downloadMinecraft"], cwd=APP_DIR)
             if os.path.exists(installer_path): os.remove(installer_path)
+
+        # 🔥 تشغيل محرك المزامنة الفيزيائية للـ Config (الحل الجذري لـ WorldEdit) 🔥
+        self.storage_mgr.hydrate_to_ram()
+
         self.logger.log("النظام", "✅ تمت التهيئة بنجاح. البيئة جاهزة.", is_safe=True)
     def start_async(self):
         if self.is_running(): return
@@ -226,40 +262,25 @@ class MinecraftDaemon:
     def _run(self):
         self.setup_environment()
         self.online_players.clear()
-        # 💡 الحل السحري والنهائي لكسر نظام XetHub الخاص بـ Hugging Face:
-        # بدلاً من عمل اختصارات، سنقوم بـ "نسخ فيزيائي" للملفات.
-        # البايثون سيجبر النظام على تحميل الملف الحقيقي (Hydration) ووضعه في الذاكرة السريعة.
+
+        # النسخ الفيزيائي للمودات
         real_mods_dir = os.path.join(APP_DIR, "mods")
         data_mods_dir = os.path.join(DATA_DIR, "mods")
         os.makedirs(real_mods_dir, exist_ok=True)
-        # تنظيف الذاكرة السريعة من المودات القديمة
         for f in os.listdir(real_mods_dir):
             file_path = os.path.join(real_mods_dir, f)
             if os.path.isfile(file_path) or os.path.islink(file_path):
                 os.remove(file_path)
-        # النسخ الفيزيائي للمودات (فك شفرة xet)
         if os.path.exists(data_mods_dir):
             for f in os.listdir(data_mods_dir):
                 if f.endswith('.jar'):
                     src = os.path.join(data_mods_dir, f)
                     dst = os.path.join(real_mods_dir, f)
                     self.logger.log("النظام", f"📦 جاري استخراج المود للذاكرة السريعة: {f}", is_safe=True)
-                    shutil.copy2(src, dst) # هذا السطر هو اللي يكسر الـ xet ويجيب الملف الأصلي
-             # --- كاسر حماية WorldEdit للملفات ---
-        schem_dir = os.path.join(DATA_DIR, "config", "worldedit", "schematics")
-        if os.path.exists(schem_dir):
-            for f in os.listdir(schem_dir):
-                if f.endswith('.schem') or f.endswith('.schematic'):
-                    filepath = os.path.join(schem_dir, f)
-                    try:
-                        with open(filepath, 'rb') as file: data = file.read()
-                        os.remove(filepath)
-                        with open(filepath, 'wb') as file: file.write(data)
-                        self.logger.log("النظام", f"🛠️ تم تجهيز ملف البيت للعمل: {f}", is_safe=True)
-                    except: pass
-        # ------------------------------------
-        config_dir = os.path.join(DATA_DIR, "config")
-        # تشغيل الجافا وتوجيهها للمجلد الحقيقي النظيف
+                    shutil.copy2(src, dst)
+        # توجيه الجافا للمجلد الفيزيائي الجديد
+        config_dir = os.path.join(APP_DIR, "config") # تم التغيير هنا لكسر الحماية
+
         java_args = [
             "java", "-Xms2G", "-Xmx5G",
             f"-Dfabric.modsDir={real_mods_dir}",
@@ -272,7 +293,7 @@ class MinecraftDaemon:
             "-XX:G1RSetUpdatingPauseTimePercent=5", "-XX:SurvivorRatio=32", "-XX:+PerfDisableSharedMem",
             "-XX:MaxTenuringThreshold=1", "-jar", "fabric-server-launch.jar", "nogui"
         ]
-        self.logger.log("Minecraft", "🚀 جاري إطلاق السيرفر وقراءة المودات الحقيقية...", is_safe=True)
+        self.logger.log("Minecraft", "🚀 جاري إطلاق السيرفر وقراءة الملفات الفيزيائية...", is_safe=True)
         try:
             self.process = subprocess.Popen(
                 java_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE, text=True, bufsize=1, cwd=APP_DIR
@@ -297,6 +318,7 @@ class MinecraftDaemon:
         finally:
             self.online_players.clear()
             self.process = None
+            self.storage_mgr.dehydrate_to_disk() # حفظ التغييرات عند التوقف
     def send_command(self, cmd: str):
         if self.is_running() and cmd.strip():
             try:
@@ -318,16 +340,24 @@ class MinecraftDaemon:
     def is_running(self) -> bool:
         return self.process is not None and self.process.poll() is None
 class WatchdogDaemon:
-    def __init__(self, mc_server: MinecraftDaemon, backup_mgr: BackupManager, logger: LoggerManager):
+    def __init__(self, mc_server: MinecraftDaemon, backup_mgr: BackupManager, storage_mgr: EnterpriseStorageManager, logger: LoggerManager):
         self.mc_server = mc_server
         self.backup_mgr = backup_mgr
+        self.storage_mgr = storage_mgr
         self.logger = logger
         self.last_backup_time = datetime.now()
     def start(self):
         threading.Thread(target=self._run, daemon=True).start()
     def _run(self):
+        sync_counter = 0
         while True:
             time.sleep(WATCHDOG_CHECK_INTERVAL)
+            sync_counter += 1
+
+            # مزامنة فيزيائية كل 60 ثانية لحفظ البيوت الجديدة
+            if sync_counter >= 6:
+                self.storage_mgr.dehydrate_to_disk()
+                sync_counter = 0
             if not self.mc_server.is_running() and not self.mc_server.intentional_stop:
                 time.sleep(5)
                 if not self.mc_server.is_running() and not self.mc_server.intentional_stop:
@@ -349,10 +379,11 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = 86400
 logger_mgr = LoggerManager()
 security_mgr = SecurityManager()
+storage_mgr = EnterpriseStorageManager(logger_mgr)
 backup_mgr = BackupManager(logger_mgr)
-mc_server = MinecraftDaemon(logger_mgr, backup_mgr)
+mc_server = MinecraftDaemon(logger_mgr, backup_mgr, storage_mgr)
 playit_net = PlayitDaemon(logger_mgr)
-watchdog = WatchdogDaemon(mc_server, backup_mgr, logger_mgr)
+watchdog = WatchdogDaemon(mc_server, backup_mgr, storage_mgr, logger_mgr)
 playit_net.start_async()
 mc_server.start_async()
 watchdog.start()
@@ -399,7 +430,7 @@ def map_proxy(subpath=''):
     target_url = f"http://127.0.0.1:8123{req_path}"
     if request.query_string: target_url += f"?{request.query_string.decode('utf-8')}"
     try:
-        req = requests.get(target_url, stream=True, timeout=5)
+        req = requests.get(target_url, stream=True, timeout=15)
         excluded_headers = ['content-encoding', 'content-length', 'transfer-encoding', 'connection']
         headers = [(name, value) for (name, value) in req.headers.items() if name.lower() not in excluded_headers]
         return Response(req.iter_content(chunk_size=10*1024), req.status_code, headers)
@@ -428,12 +459,10 @@ def action():
 def send_command():
     cmd = request.form.get('cmd')
     if not cmd: return "Bad Request", 400
-    # 💥 الأمر السري لمسح العالم
     if cmd.strip() == "!resetworld":
         shutil.rmtree(os.path.join(DATA_DIR, "world"), ignore_errors=True)
         logger_mgr.log("النظام", "💥 تم فرمتة العالم القديم بنجاح! أوقف السيرفر وشغله من جديد لتوليد عالم بالسيد الجديد.", is_safe=True)
         return "OK"
-    # 🚀 الأمر السري الجديد: تحميل المودات برابط مباشر (لتجاوز تلف ملفات Hugging Face)
     if cmd.strip().startswith("!installmod "):
         url = cmd.strip().split(" ", 1)[1]
         def download_mod():
@@ -441,12 +470,9 @@ def send_command():
                 logger_mgr.log("النظام", f"⬇️ جاري تحميل المود من الرابط المباشر...", is_safe=True)
                 mods_dir = os.path.join(DATA_DIR, "mods")
                 os.makedirs(mods_dir, exist_ok=True)
-
-                # استخراج اسم الملف من الرابط
                 filename = url.split("/")[-1]
                 if not filename.endswith(".jar"): filename = "downloaded_mod.jar"
                 filepath = os.path.join(mods_dir, filename)
-                # التحميل المباشر
                 response = requests.get(url, stream=True)
                 response.raise_for_status()
                 with open(filepath, 'wb') as f:
@@ -459,7 +485,7 @@ def send_command():
         return "OK"
     mc_server.send_command(cmd)
     return "OK"
-@app.route('/api/mods', methods=['GET', 'POST']) # <--- هذا السطر الناقص اللي يحل المشكلة!
+@app.route('/api/mods', methods=['GET', 'POST'])
 def handle_mods():
     mods_path = os.path.join(DATA_DIR, "mods")
     if request.method == 'POST':
@@ -532,7 +558,7 @@ def file_manager():
     for root, dirs, files in os.walk(DATA_DIR):
         if 'world' in root or 'backups' in root: continue
         for file in files:
-            if file.endswith(('.json', '.properties', '.txt', '.log')):
+            if file.endswith(('.json', '.properties', '.txt', '.log', '.schem', '.schematic')):
                 rel_path = os.path.relpath(os.path.join(root, file), DATA_DIR)
                 file_list.append(rel_path)
     return jsonify(file_list)
