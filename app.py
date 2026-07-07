@@ -196,7 +196,8 @@ class MinecraftDaemon:
         os.makedirs(APP_DIR, exist_ok=True)
 
         self.force_symlink(os.path.join(DATA_DIR, "world"), os.path.join(APP_DIR, "world"))
-
+        self.force_symlink(os.path.join(DATA_DIR, "config"), os.path.join(APP_DIR, "config"))
+        
         files_to_link = ['server.properties', 'ops.json', 'banned-players.json', 'banned-ips.json', 'whitelist.json', 'usercache.json']
         for f in files_to_link:
             file_path = os.path.join(DATA_DIR, f)
