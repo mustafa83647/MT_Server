@@ -1,70 +1,32 @@
 """
 =========================================================================================
-👑 ULTIMATE MINECRAFT SERVER PANEL - GOD-TIER ENTERPRISE EDITION 👑
+👑 ULTIMATE MINECRAFT SERVER PANEL - MODULAR ENTERPRISE EDITION 👑
 =========================================================================================
 Author: Senior AI Architect
-Version: 13.0.0 (God-Tier UI / Flawless Architecture)
-Description: Ultimate Glassmorphism UI, 3D Player Avatars, Custom Modals, Pro Terminal.
+Version: 14.0.0 (Modular Architecture + God-Tier UI)
+Description: Clean app.py acting as the API and Frontend router.
 =========================================================================================
 """
 import os
-import sys
-import time
-import threading
-import subprocess
-import re
 import shutil
+import threading
 import psutil
 import html
-import json
-import logging
 import requests
-import zipfile
-from datetime import datetime, timedelta
-from collections import deque
+from datetime import datetime
 from flask import Flask, render_template_string, request, redirect, session, jsonify, send_from_directory, abort, Response
 from werkzeug.utils import secure_filename
 # =========================================================================================
-# 1. CORE CONFIGURATION & CONSTANTS
+# 1. استيراد الأنظمة الأساسية من مجلد (core)
 # =========================================================================================
-DATA_DIR = "/data/minecraft_data"
-APP_DIR = "/app/minecraft"
-PASSWORD = os.environ.get("PANEL_PASSWORD", "2938")
-FLASK_SECRET = os.environ.get("FLASK_SECRET", f"enterprise-secret-{PASSWORD}")
-MAX_LOG_LINES = 1000
-AUTO_BACKUP_INTERVAL_HOURS = 6
-WATCHDOG_CHECK_INTERVAL = 10
-ANSI_ESCAPE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-PLAYER_JOIN_REGEX = re.compile(r': ([a-zA-Z0-9_]{3,16}) joined the game')
-PLAYER_LEAVE_REGEX = re.compile(r': ([a-zA-Z0-9_]{3,16}) left the game')
+from core.config import DATA_DIR, APP_DIR, PASSWORD, FLASK_SECRET, SERVER_PROPERTIES_SCHEMA
+from core.logger import LoggerManager
+from core.security import SecurityManager
+from core.storage import EnterpriseStorageManager
+from core.network import PlayitDaemon
+from core.minecraft import MinecraftDaemon, WatchdogDaemon
 # =========================================================================================
-# 2. THE ULTIMATE SERVER PROPERTIES SCHEMA
-# =========================================================================================
-SERVER_PROPERTIES_SCHEMA = [
-    {"key": "motd", "label": "رسالة الترحيب (MOTD)", "type": "text", "default": "A Minecraft Server"},
-    {"key": "max-players", "label": "أقصى عدد لاعبين", "type": "number", "default": "20"},
-    {"key": "difficulty", "label": "مستوى الصعوبة", "type": "select", "options": ["peaceful", "easy", "normal", "hard"], "default": "easy"},
-    {"key": "pvp", "label": "القتال بين اللاعبين (PVP)", "type": "boolean", "default": "true"},
-    {"key": "hardcore", "label": "وضع الهاردكور (موتة وحدة)", "type": "boolean", "default": "false"},
-    {"key": "view-distance", "label": "مسافة الرؤية (Chunks)", "type": "number", "default": "10"},
-    {"key": "simulation-distance", "label": "مسافة المحاكاة", "type": "number", "default": "10"},
-    {"key": "level-seed", "label": "سيد العالم (Seed)", "type": "text", "default": ""},
-    {"key": "allow-nether", "label": "تفعيل النذر (Nether)", "type": "boolean", "default": "true"},
-    {"key": "allow-flight", "label": "السماح بالطيران (يمنع الطرد)", "type": "boolean", "default": "false"},
-    {"key": "enable-command-block", "label": "تفعيل الكوماند بلوك", "type": "boolean", "default": "false"},
-    {"key": "spawn-protection", "label": "حماية نقطة البداية (بلوكات)", "type": "number", "default": "16"},
-    {"key": "white-list", "label": "تفعيل القائمة البيضاء", "type": "boolean", "default": "false"},
-    {"key": "force-gamemode", "label": "إجبار وضع اللعب عند الدخول", "type": "boolean", "default": "false"},
-    {"key": "max-build-height", "label": "أقصى ارتفاع للبناء", "type": "number", "default": "320"},
-    {"key": "enforce-secure-profile", "label": "تشفير الشات (يفضل False للمكرك)", "type": "boolean", "default": "false"},
-    {"key": "spawn-monsters", "label": "ترسبن الوحوش", "type": "boolean", "default": "true"},
-    {"key": "spawn-animals", "label": "ترسبن الحيوانات", "type": "boolean", "default": "true"},
-    {"key": "spawn-npcs", "label": "ترسبن القرويين (NPCs)", "type": "boolean", "default": "true"},
-    {"key": "generate-structures", "label": "توليد القرى والمعابد", "type": "boolean", "default": "true"},
-    {"key": "online-mode", "label": "حسابات أصلية فقط (Online Mode)", "type": "boolean", "default": "false"}
-]
-# =========================================================================================
-# 3. ENTERPRISE CLASSES (OOP ARCHITECTURE)
+# 2. أدوات إضافية (النسخ الاحتياطي وقراءة الرام)
 # =========================================================================================
 def get_container_ram_percent():
     try:
@@ -81,119 +43,8 @@ def get_container_ram_percent():
             return round((used / total) * 100, 1)
         except:
             return psutil.virtual_memory().percent
-class LoggerManager:
-    def __init__(self):
-        self.logs = deque(maxlen=MAX_LOG_LINES)
-        self.lock = threading.Lock()
-    def log(self, source: str, message: str, is_safe: bool = False, color: str = "#94a3b8"):
-        with self.lock:
-            timestamp = datetime.now().strftime("%H:%M:%S")
-            clean_msg = ANSI_ESCAPE.sub('', message.strip())
-            if not clean_msg: return
-            if not is_safe: clean_msg = html.escape(clean_msg)
-            source_color = {"النظام": "#0ea5e9", "Minecraft": "#10b981", "Playit": "#f59e0b", "أنت": "#ec4899", "Watchdog": "#ef4444", "Backup": "#8b5cf6"}.get(source, color)
-            formatted_msg = f"<span class='log-time'>[{timestamp}]</span> <span class='log-source' style='color:{source_color};'>[{source}]</span> <span class='log-msg'>{clean_msg}</span>"
-            self.logs.append(formatted_msg)
-    def get_logs(self) -> list:
-        with self.lock: return list(self.logs)
-class SecurityManager:
-    def __init__(self):
-        self.failed_logins = {}
-        self.MAX_ATTEMPTS = 5
-        self.LOCKOUT_TIME = 900
-    def check_ip(self, ip: str) -> tuple[bool, str]:
-        current_time = time.time()
-        if ip in self.failed_logins:
-            attempts, lockout_time = self.failed_logins[ip]
-            if current_time < lockout_time:
-                remaining = int((lockout_time - current_time) / 60)
-                return False, f"تم حظر عنوان IP الخاص بك مؤقتاً لدواعي أمنية. حاول بعد {remaining} دقيقة."
-            elif current_time >= lockout_time and attempts >= self.MAX_ATTEMPTS:
-                self.failed_logins.pop(ip, None)
-        return True, ""
-    def register_failure(self, ip: str):
-        current_time = time.time()
-        attempts, _ = self.failed_logins.get(ip, (0, 0))
-        attempts += 1
-        lockout = current_time + self.LOCKOUT_TIME if attempts >= self.MAX_ATTEMPTS else 0
-        self.failed_logins[ip] = (attempts, lockout)
-    def register_success(self, ip: str):
-        self.failed_logins.pop(ip, None)
-    @staticmethod
-    def sanitize_path(target: str, base_dir: str) -> str:
-        target_path = os.path.realpath(os.path.join(base_dir, target))
-        safe_dir = os.path.realpath(base_dir)
-        if not target_path.startswith(safe_dir):
-            raise PermissionError("Security Violation: Path Traversal Attempted")
-        return target_path
-class EnterpriseStorageManager:
-    def __init__(self, logger: LoggerManager):
-        self.logger = logger
-        self.data_config = os.path.join(DATA_DIR, "config")
-        self.app_config = os.path.join(APP_DIR, "config")
-    def hydrate_to_ram(self):
-        self.logger.log("النظام", "🔄 جاري تفعيل محرك المزامنة الفيزيائية لكسر حماية WorldEdit...", is_safe=True)
-        os.makedirs(self.data_config, exist_ok=True)
-        if os.path.islink(self.app_config): os.remove(self.app_config)
-        elif os.path.exists(self.app_config): shutil.rmtree(self.app_config)
-        try:
-            shutil.copytree(self.data_config, self.app_config, dirs_exist_ok=True)
-            self.logger.log("النظام", "✅ تم بناء الملفات الفيزيائية بنجاح. WorldEdit الآن أعمى عن الـ Bucket!", is_safe=True)
-        except Exception as e:
-            self.logger.log("النظام", f"❌ خطأ في المزامنة الفيزيائية: {e}", is_safe=True)
-    def dehydrate_to_disk(self):
-        if not os.path.exists(self.app_config): return
-        try:
-            shutil.copytree(self.app_config, self.data_config, dirs_exist_ok=True)
-            for root, dirs, files in os.walk(self.data_config):
-                rel_path = os.path.relpath(root, self.data_config)
-                app_root = os.path.join(self.app_config, rel_path)
-                for file in files:
-                    if not os.path.exists(os.path.join(app_root, file)):
-                        os.remove(os.path.join(root, file))
-                for d in dirs:
-                    if not os.path.exists(os.path.join(app_root, d)):
-                        shutil.rmtree(os.path.join(root, d))
-        except: pass
-class PlayitDaemon:
-    def __init__(self, logger: LoggerManager):
-        self.process = None
-        self.logger = logger
-        self.status = "loading"
-        self.ip = "جاري الاتصال..."
-        self.thread = None
-    def start_async(self):
-        if self.thread and self.thread.is_alive(): return
-        self.thread = threading.Thread(target=self._run, daemon=True)
-        self.thread.start()
-    def _run(self):
-        secret = os.environ.get("PLAYIT_SECRET")
-        static_ip = os.environ.get("PLAYIT_IP", "الآي بي الثابت (انسخه من موقع Playit)")
-        if not secret:
-            self.status = "error"
-            self.ip = "مفقود PLAYIT_SECRET"
-            self.logger.log("Playit", "❌ خطأ قاتل: لم يتم العثور على PLAYIT_SECRET في إعدادات السبيس!", is_safe=True)
-            return
-        env = os.environ.copy()
-        env["HOME"] = DATA_DIR
-        self.logger.log("Playit", "🔄 جاري بدء الاتصال بخوادم Playit العالمية...", is_safe=True)
-        try:
-            self.process = subprocess.Popen(["playit", "--secret", secret.strip()], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, text=True, bufsize=1, env=env)
-            self.status = "connected"
-            self.ip = static_ip
-            for line in self.process.stdout:
-                clean_line = ANSI_ESCAPE.sub('', line.strip())
-                if not clean_line: continue
-                safe_line = html.escape(clean_line)
-                if "error" in clean_line.lower() or "invalid" in clean_line.lower() or "fail" in clean_line.lower():
-                    self.logger.log("Playit", f"❌ {safe_line}", is_safe=True)
-                elif "tunnel" in clean_line.lower() or "registered" in clean_line.lower() or "connected" in clean_line.lower():
-                    self.logger.log("Playit", f"🌐 {safe_line}", is_safe=True)
-        except Exception as e:
-            self.logger.log("Playit", f"❌ انهيار في أداة الشبكة: {html.escape(str(e))}", is_safe=True)
-            self.status = "error"
 class BackupManager:
-    def __init__(self, logger: LoggerManager):
+    def __init__(self, logger):
         self.logger = logger
         self.backup_dir = os.path.join(DATA_DIR, "backups")
         self.world_dir = os.path.join(DATA_DIR, "world")
@@ -217,170 +68,8 @@ class BackupManager:
     def get_backups_list(self) -> list:
         if not os.path.exists(self.backup_dir): return []
         return sorted([f for f in os.listdir(self.backup_dir) if f.endswith('.zip')], reverse=True)
-class MinecraftDaemon:
-    def __init__(self, logger: LoggerManager, backup_mgr: BackupManager, storage_mgr: EnterpriseStorageManager):
-        self.process = None
-        self.logger = logger
-        self.backup_mgr = backup_mgr
-        self.storage_mgr = storage_mgr
-        self.online_players = set()
-        self.thread = None
-        self.intentional_stop = False
-    def force_symlink(self, src: str, dst: str):
-        try:
-            if os.path.islink(dst) or os.path.isfile(dst): os.remove(dst)
-            elif os.path.isdir(dst): shutil.rmtree(dst)
-            os.symlink(src, dst)
-        except Exception as e:
-            self.logger.log("النظام", f"⚠️ تحذير أثناء ربط {os.path.basename(dst)}: {html.escape(str(e))}", is_safe=True)
-    def setup_environment(self):
-        self.logger.log("النظام", "🛠️ جاري تهيئة بيئة السيرفر (Enterprise Secure Mode)...", is_safe=True)
-        for d in ['world', 'mods', 'config', 'backups', 'logs', 'crash-reports']:
-            os.makedirs(os.path.join(DATA_DIR, d), exist_ok=True)
-        os.makedirs(APP_DIR, exist_ok=True)
-        self.force_symlink(os.path.join(DATA_DIR, "world"), os.path.join(APP_DIR, "world"))
-        self.force_symlink(os.path.join(DATA_DIR, "logs"), os.path.join(APP_DIR, "logs"))
-        self.force_symlink(os.path.join(DATA_DIR, "crash-reports"), os.path.join(APP_DIR, "crash-reports"))
-        files_to_link = ['server.properties', 'ops.json', 'banned-players.json', 'banned-ips.json', 'whitelist.json', 'usercache.json']
-        for f in files_to_link:
-            file_path = os.path.join(DATA_DIR, f)
-            if not os.path.exists(file_path):
-                with open(file_path, 'w') as file:
-                    if f == 'server.properties': file.write("online-mode=false\n")
-                    elif f.endswith('.json'): file.write("[]\n")
-            self.force_symlink(file_path, os.path.join(APP_DIR, f))
-        with open(os.path.join(APP_DIR, "eula.txt"), 'w') as f: f.write("eula=true\n")
-        fabric_jar = os.path.join(APP_DIR, "fabric-server-launch.jar")
-        if not os.path.exists(fabric_jar):
-            self.logger.log("النظام", "⬇️ جاري تحميل وتثبيت محرك Fabric (1.20.4)...", is_safe=True)
-            installer_path = os.path.join(APP_DIR, "fabric-installer.jar")
-            subprocess.run(["wget", "-q", "-O", installer_path, "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.jar"])
-            subprocess.run(["java", "-jar", "fabric-installer.jar", "server", "-mcversion", "1.20.4", "-loader", "0.15.7", "-downloadMinecraft"], cwd=APP_DIR)
-            if os.path.exists(installer_path): os.remove(installer_path)
-        self.storage_mgr.hydrate_to_ram()
-        self.logger.log("النظام", "✅ تمت التهيئة بنجاح. البيئة جاهزة.", is_safe=True)
-    def start_async(self):
-        if self.is_running(): return
-        self.intentional_stop = False
-        self.thread = threading.Thread(target=self._run, daemon=True)
-        self.thread.start()
-    def _run(self):
-        self.setup_environment()
-        self.online_players.clear()
-        real_mods_dir = os.path.join(APP_DIR, "mods")
-        data_mods_dir = os.path.join(DATA_DIR, "mods")
-        os.makedirs(real_mods_dir, exist_ok=True)
-        for f in os.listdir(real_mods_dir):
-            file_path = os.path.join(real_mods_dir, f)
-            if os.path.isfile(file_path) or os.path.islink(file_path): os.remove(file_path)
-        if os.path.exists(data_mods_dir):
-            for f in os.listdir(data_mods_dir):
-                if f.endswith('.jar'):
-                    src = os.path.join(data_mods_dir, f)
-                    dst = os.path.join(real_mods_dir, f)
-                    self.logger.log("النظام", f"📦 جاري استخراج المود للذاكرة السريعة: {f}", is_safe=True)
-                    shutil.copy2(src, dst)
-        # --- كاسر حماية التخزين السحابي للعالم (World Hydration) ---
-        self.logger.log("النظام", "⏳ جاري إيقاظ ملفات العالم من السبات السحابي...", is_safe=True)
-        world_path = os.path.join(DATA_DIR, "world")
-        if os.path.exists(world_path):
-            for root, dirs, files in os.walk(world_path):
-                for file in files:
-                    filepath = os.path.join(root, file)
-                    try:
-                        with open(filepath, 'rb') as f: f.read(1)
-                    except Exception:
-                        try: os.remove(filepath)
-                        except: pass
-        # -----------------------------------------------------------
-        config_dir = os.path.join(APP_DIR, "config")
-        java_args = [
-            "java", "-Xms2G", "-Xmx8G",
-            f"-Dfabric.modsDir={real_mods_dir}",
-            f"-Dfabric.configDir={config_dir}",
-            "-XX:+UseG1GC", "-XX:+ParallelRefProcEnabled", "-XX:MaxGCPauseMillis=200",
-            "-XX:+UnlockExperimentalVMOptions", "-XX:+DisableExplicitGC", "-XX:+AlwaysPreTouch",
-            "-XX:G1NewSizePercent=30", "-XX:G1MaxNewSizePercent=40", "-XX:G1HeapRegionSize=8M",
-            "-XX:G1ReservePercent=20", "-XX:G1HeapWastePercent=5", "-XX:G1MixedGCCountTarget=4",
-            "-XX:InitiatingHeapOccupancyPercent=15", "-XX:G1MixedGCLiveThresholdPercent=90",
-            "-XX:G1RSetUpdatingPauseTimePercent=5", "-XX:SurvivorRatio=32", "-XX:+PerfDisableSharedMem",
-            "-XX:MaxTenuringThreshold=1", "-jar", "fabric-server-launch.jar", "nogui"
-        ]
-        self.logger.log("Minecraft", "🚀 جاري إطلاق السيرفر وقراءة الملفات الفيزيائية...", is_safe=True)
-        try:
-            self.process = subprocess.Popen(
-                java_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE, text=True, bufsize=1, cwd=APP_DIR
-            )
-            for line in self.process.stdout:
-                clean_line = ANSI_ESCAPE.sub('', line.strip())
-                if not clean_line: continue
-                safe_line = html.escape(clean_line)
-                self.logger.log("Minecraft", safe_line, is_safe=True)
-                join_match = PLAYER_JOIN_REGEX.search(clean_line)
-                if join_match: self.online_players.add(html.escape(join_match.group(1)))
-                leave_match = PLAYER_LEAVE_REGEX.search(clean_line)
-                if leave_match and html.escape(leave_match.group(1)) in self.online_players:
-                    self.online_players.remove(html.escape(leave_match.group(1)))
-            self.process.wait()
-            if not self.intentional_stop:
-                self.logger.log("Minecraft", "⚠️ السيرفر توقف بشكل غير متوقع (Crash)!", is_safe=True)
-            else:
-                self.logger.log("Minecraft", "🛑 توقف السيرفر بأمان.", is_safe=True)
-        except Exception as e:
-            self.logger.log("Minecraft", f"❌ فشل في تشغيل الجافا: {html.escape(str(e))}", is_safe=True)
-        finally:
-            self.online_players.clear()
-            self.process = None
-            self.storage_mgr.dehydrate_to_disk()
-    def send_command(self, cmd: str):
-        if self.is_running() and cmd.strip():
-            try:
-                self.process.stdin.write(cmd + "\n")
-                self.process.stdin.flush()
-                self.logger.log("أنت", f"> {html.escape(cmd)}", is_safe=True)
-            except Exception as e:
-                self.logger.log("النظام", f"❌ فشل إرسال الأمر: {e}", is_safe=True)
-    def stop(self):
-        if self.is_running():
-            self.intentional_stop = True
-            self.send_command("stop")
-            self.logger.log("النظام", "⏳ جاري حفظ العالم وإيقاف السيرفر بأمان...", is_safe=True)
-    def kill(self):
-        if self.is_running():
-            self.intentional_stop = True
-            self.process.kill()
-            self.logger.log("النظام", "💀 تم قتل العملية إجبارياً!", is_safe=True)
-    def is_running(self) -> bool:
-        return self.process is not None and self.process.poll() is None
-class WatchdogDaemon:
-    def __init__(self, mc_server: MinecraftDaemon, backup_mgr: BackupManager, storage_mgr: EnterpriseStorageManager, logger: LoggerManager):
-        self.mc_server = mc_server
-        self.backup_mgr = backup_mgr
-        self.storage_mgr = storage_mgr
-        self.logger = logger
-        self.last_backup_time = datetime.now()
-    def start(self):
-        threading.Thread(target=self._run, daemon=True).start()
-    def _run(self):
-        sync_counter = 0
-        while True:
-            time.sleep(WATCHDOG_CHECK_INTERVAL)
-            sync_counter += 1
-            if sync_counter >= 6:
-                self.storage_mgr.dehydrate_to_disk()
-                sync_counter = 0
-            if not self.mc_server.is_running() and not self.mc_server.intentional_stop:
-                time.sleep(5)
-                if not self.mc_server.is_running() and not self.mc_server.intentional_stop:
-                    self.logger.log("Watchdog", "🚨 اكتشف النظام توقف السيرفر! جاري إعادة التشغيل التلقائي...", is_safe=True)
-                    self.mc_server.start_async()
-            current_time = datetime.now()
-            if (current_time - self.last_backup_time).total_seconds() >= (AUTO_BACKUP_INTERVAL_HOURS * 3600):
-                self.logger.log("Watchdog", "⏰ حان وقت النسخ الاحتياطي التلقائي المجدول.", is_safe=True)
-                self.backup_mgr.create_backup_async()
-                self.last_backup_time = current_time
 # =========================================================================================
-# 4. INITIALIZE FLASK & MANAGERS
+# 3. تهيئة السيرفر والأنظمة (Initialization)
 # =========================================================================================
 app = Flask(__name__)
 app.secret_key = FLASK_SECRET
@@ -399,7 +88,7 @@ playit_net.start_async()
 mc_server.start_async()
 watchdog.start()
 # =========================================================================================
-# 5. FLASK ROUTES & API
+# 4. مسارات الـ API (Routes)
 # =========================================================================================
 @app.before_request
 def check_auth():
@@ -514,7 +203,6 @@ def handle_mods():
                 os.remove(os.path.join(mods_path, safe_name))
             except: pass
         return "OK"
-
     mods_list = []
     if os.path.exists(mods_path):
         for f in os.listdir(mods_path):
@@ -527,7 +215,6 @@ def handle_backup_route():
     if request.method == 'POST':
         backup_mgr.create_backup_async()
         return "Started"
-
     backups = []
     if os.path.exists(backup_mgr.backup_dir):
         for f in os.listdir(backup_mgr.backup_dir):
@@ -599,7 +286,7 @@ def get_crash():
     if not crashes: return "السيرفر مستقر، لا توجد تقارير كراش."
     with open(os.path.join(crash_dir, crashes[0]), 'r') as f: return html.escape(f.read())
 # =========================================================================================
-# 6. HTML/CSS/JS TEMPLATES (THE FRONTEND - GOD TIER UI)
+# 5. واجهات المستخدم (HTML/CSS/JS) - God Tier UI
 # =========================================================================================
 LOGIN_HTML = """
 <!DOCTYPE html>
@@ -668,7 +355,6 @@ DASHBOARD_HTML = """
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Cairo', sans-serif; background: var(--bg-base); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
-
         /* Scrollbar */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: var(--bg-base); }
@@ -684,11 +370,9 @@ DASHBOARD_HTML = """
         .nav-item i { font-size: 18px; width: 24px; text-align: center; }
         .nav-item:hover { background: rgba(255,255,255,0.03); color: var(--text-main); border-color: var(--border); transform: translateX(-4px); }
         .nav-item.active { background: linear-gradient(90deg, rgba(59,130,246,0.15), transparent); color: var(--primary); border-color: var(--primary-glow); border-right: 3px solid var(--primary); }
-
         /* Main Content */
         .main-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
         .bg-glow { position: absolute; top: -20%; left: -10%; width: 50%; height: 50%; background: radial-gradient(circle, var(--primary-glow) 0%, transparent 70%); filter: blur(100px); z-index: 0; pointer-events: none; opacity: 0.5; }
-
         /* Header */
         .header { padding: 20px 32px; display: flex; justify-content: space-between; align-items: center; background: var(--bg-glass); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); z-index: 10; }
         .network-pill { display: flex; align-items: center; gap: 12px; background: rgba(0,0,0,0.4); padding: 8px 16px; border-radius: 50px; border: 1px solid var(--border); }
@@ -705,7 +389,6 @@ DASHBOARD_HTML = """
         .tab-pane { display: none; animation: fadeUp 0.4s ease forwards; }
         .tab-pane.active { display: block; }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-
         /* Stats Grid */
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; margin-bottom: 32px; }
         .stat-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px; position: relative; overflow: hidden; transition: var(--transition); }
@@ -749,7 +432,6 @@ DASHBOARD_HTML = """
         .data-icon { width: 40px; height: 40px; border-radius: 10px; background: rgba(255,255,255,0.05); display: flex; justify-content: center; align-items: center; font-size: 20px; color: var(--primary); }
         .data-name { font-weight: 700; font-size: 16px; font-family: 'Fira Code'; direction: ltr; }
         .data-meta { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
-
         /* Drag & Drop Zone */
         .drop-zone { border: 2px dashed var(--border); border-radius: var(--radius-lg); padding: 40px; text-align: center; background: rgba(0,0,0,0.2); cursor: pointer; transition: var(--transition); margin-bottom: 24px; }
         .drop-zone:hover, .drop-zone.dragover { border-color: var(--primary); background: rgba(59,130,246,0.05); }
@@ -761,7 +443,6 @@ DASHBOARD_HTML = """
         .setting-card:focus-within { border-color: var(--primary); }
         .setting-info h4 { font-size: 15px; margin-bottom: 4px; }
         .setting-info p { font-size: 12px; color: var(--text-muted); font-family: 'Fira Code'; }
-
         /* Custom Toggle Switch */
         .switch { position: relative; display: inline-block; width: 50px; height: 28px; }
         .switch input { opacity: 0; width: 0; height: 0; }
@@ -769,7 +450,6 @@ DASHBOARD_HTML = """
         .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
         input:checked + .slider { background-color: var(--success); border-color: var(--success); }
         input:checked + .slider:before { transform: translateX(22px); }
-
         /* Custom Inputs */
         .custom-input { background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: white; padding: 8px 12px; border-radius: 6px; outline: none; font-family: 'Fira Code'; width: 120px; text-align: center; transition: 0.3s; }
         .custom-input:focus { border-color: var(--primary); }
@@ -841,7 +521,6 @@ DASHBOARD_HTML = """
     </div>
     <div class="main-wrapper">
         <div class="bg-glow"></div>
-
         <div class="header">
             <div class="network-pill">
                 <div class="status-dot" id="net-dot"></div>
@@ -876,7 +555,6 @@ DASHBOARD_HTML = """
                         <div class="chart-bg"><canvas id="ramChart"></canvas></div>
                     </div>
                 </div>
-
                 <h3 style="margin-bottom: 20px; font-weight: 800;">التحكم السريع</h3>
                 <div style="display: flex; gap: 15px; flex-wrap: wrap;">
                     <button class="btn btn-success" onclick="sendAction('start')"><i class="fa-solid fa-play"></i> تشغيل السيرفر</button>
@@ -1059,22 +737,17 @@ DASHBOARD_HTML = """
                 document.getElementById('cpu-text').innerText = data.cpu + '%';
                 document.getElementById('ram-text').innerText = data.ram + '%';
                 updateCharts(data.cpu, data.ram);
-
                 let statusEl = document.getElementById('status-text');
                 statusEl.innerText = data.status;
                 statusEl.style.color = data.status.includes('شغال') ? 'var(--success)' : 'var(--danger)';
-
                 document.getElementById('players-count').innerHTML = `${data.players.length}<span style="font-size:16px; color:var(--text-muted)">/20</span>`;
-
                 let ipDisplay = document.getElementById('ip-display');
                 let netDot = document.getElementById('net-dot');
                 ipDisplay.innerText = data.network.ip;
                 if(data.network.status === 'error') { netDot.className = 'status-dot'; ipDisplay.style.color = 'var(--danger)'; }
                 else { netDot.className = 'status-dot online'; ipDisplay.style.color = 'var(--text-main)'; }
-
                 consoleBox.innerHTML = data.logs.join('<br>');
                 if (autoScroll) consoleBox.scrollTop = consoleBox.scrollHeight;
-
                 // Render Players Grid
                 let p_html = data.players.length === 0 ? '<p style="color: var(--text-muted); grid-column: 1/-1; text-align: center; padding: 40px;">لا يوجد لاعبين متصلين حالياً.</p>' : '';
                 data.players.forEach(p => {
@@ -1103,11 +776,9 @@ DASHBOARD_HTML = """
             if(files.length === 0) return;
             let file = files[0];
             if(!file.name.endsWith('.jar')) return showToast('يجب أن يكون الملف بصيغة .jar', 'error');
-
             let formData = new FormData();
             formData.append("file", file);
             showToast('جاري رفع المود...', 'info');
-
             fetch('/api/mods', { method: 'POST', body: formData }).then(() => {
                 showToast('تم رفع المود بنجاح!', 'success');
                 loadMods();
