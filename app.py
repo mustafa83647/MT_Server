@@ -280,9 +280,22 @@ class MinecraftDaemon:
                     dst = os.path.join(real_mods_dir, f)
                     self.logger.log("النظام", f"📦 جاري استخراج المود للذاكرة السريعة: {f}", is_safe=True)
                     shutil.copy2(src, dst)
+        # --- كاسر حماية التخزين السحابي للعالم (World Hydration) ---
+        self.logger.log("النظام", "⏳ جاري إيقاظ ملفات العالم من السبات السحابي...", is_safe=True)
+        world_path = os.path.join(DATA_DIR, "world")
+        if os.path.exists(world_path):
+            for root, dirs, files in os.walk(world_path):
+                for file in files:
+                    filepath = os.path.join(root, file)
+                    try:
+                        with open(filepath, 'rb') as f: f.read(1)
+                    except Exception:
+                        try: os.remove(filepath)
+                        except: pass
+        # -----------------------------------------------------------
         config_dir = os.path.join(APP_DIR, "config")
         java_args = [
-            "java", "-Xms2G", "-Xmx5G",
+            "java", "-Xms2G", "-Xmx8G",
             f"-Dfabric.modsDir={real_mods_dir}",
             f"-Dfabric.configDir={config_dir}",
             "-XX:+UseG1GC", "-XX:+ParallelRefProcEnabled", "-XX:MaxGCPauseMillis=200",
