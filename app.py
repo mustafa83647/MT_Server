@@ -3,8 +3,8 @@
 👑 ULTIMATE MINECRAFT SERVER PANEL - MODULAR ENTERPRISE EDITION 👑
 =========================================================================================
 Author: Senior AI Architect
-Version: 14.0.0 (Modular Architecture + God-Tier UI)
-Description: Clean app.py acting as the API and Frontend router.
+Version: 14.1.0 (Modular Architecture + God-Tier UI + Quick Sync)
+Description: Clean app.py acting as the API and Frontend router with new Quick Actions.
 =========================================================================================
 """
 import os
@@ -127,8 +127,10 @@ def map_proxy(subpath=''):
     req_path = request.path
     if req_path.startswith('/map/'): req_path = req_path.replace('/map/', '/', 1)
     elif req_path == '/map': req_path = '/'
+
     target_url = f"http://127.0.0.1:8123{req_path}"
     if request.query_string: target_url += f"?{request.query_string.decode('utf-8')}"
+
     try:
         req = requests.get(target_url, stream=True, timeout=15)
         excluded_headers = ['content-encoding', 'content-length', 'transfer-encoding', 'connection']
@@ -159,6 +161,12 @@ def action():
 def send_command():
     cmd = request.form.get('cmd')
     if not cmd: return "Bad Request", 400
+    # --- الأمر السحري الجديد للمزامنة ---
+    if cmd.strip() == "!sync":
+        logger_mgr.log("النظام", "🔄 جاري سحب الملفات الجديدة من الموقع إلى السيرفر...", is_safe=True)
+        storage_mgr.hydrate_to_ram()
+        logger_mgr.log("النظام", "✅ تم مزامنة الملفات بنجاح! يمكنك استخدامها الآن.", is_safe=True)
+        return "OK"
     if cmd.strip() == "!resetworld":
         if mc_server.is_running():
             logger_mgr.log("النظام", "❌ لا يمكنك فرمتة العالم والسيرفر يعمل! قم بإيقاف السيرفر أولاً.", is_safe=True)
@@ -242,6 +250,7 @@ def handle_config():
                     else: f.write(line)
                 for k, v in data.items(): f.write(f"{k}={v}\n")
         return "Saved"
+
     props = {}
     if os.path.exists(config_path):
         with open(config_path, 'r') as f:
@@ -259,6 +268,7 @@ def file_manager():
             target_path = security_mgr.sanitize_path(target, DATA_DIR)
         except PermissionError:
             return "Access Denied", 403
+
         if action == 'delete':
             try:
                 if os.path.isfile(target_path): os.remove(target_path)
@@ -404,6 +414,7 @@ DASHBOARD_HTML = """
         .btn-success { background: linear-gradient(135deg, var(--success), #059669); box-shadow: 0 4px 15px var(--success-glow); }
         .btn-danger { background: linear-gradient(135deg, var(--danger), #dc2626); box-shadow: 0 4px 15px var(--danger-glow); }
         .btn-warning { background: linear-gradient(135deg, var(--warning), #d97706); }
+        .btn-info { background: linear-gradient(135deg, var(--info), #0284c7); box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4); }
         .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-main); }
         .btn-outline:hover { background: var(--border-hover); }
         /* Console */
@@ -559,6 +570,8 @@ DASHBOARD_HTML = """
                 <div style="display: flex; gap: 15px; flex-wrap: wrap;">
                     <button class="btn btn-success" onclick="sendAction('start')"><i class="fa-solid fa-play"></i> تشغيل السيرفر</button>
                     <button class="btn btn-warning" onclick="sendAction('stop')"><i class="fa-solid fa-stop"></i> إيقاف آمن</button>
+                    <button class="btn btn-primary" onclick="execCmd('!sync')"><i class="fa-solid fa-rotate"></i> مزامنة الملفات</button>
+                    <button class="btn btn-info" onclick="window.open('/map/', '_blank')"><i class="fa-solid fa-map-location-dot"></i> فتح الخريطة</button>
                     <button class="btn btn-danger" onclick="confirmAction('إيقاف إجباري', 'هل أنت متأكد؟ قد تفقد آخر التغييرات في العالم.', () => sendAction('kill'))"><i class="fa-solid fa-skull"></i> إيقاف إجباري</button>
                     <button class="btn btn-outline" onclick="confirmAction('فرمتة العالم', 'تحذير خطير! سيتم مسح العالم بالكامل ولا يمكن التراجع. هل أنت متأكد؟', () => execCmd('!resetworld'))" style="color: var(--danger); border-color: var(--danger);"><i class="fa-solid fa-bomb"></i> فرمتة العالم</button>
                 </div>
