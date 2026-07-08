@@ -3,8 +3,8 @@
 👑 ULTIMATE MINECRAFT SERVER PANEL - GOD-TIER ENTERPRISE EDITION 👑
 =========================================================================================
 Author: Senior AI Architect
-Version: 11.0.0 (Titanium Build - WorldEdit Bypass Engine)
-Description: Features a Bidirectional Physical Sync Engine to bypass Java Canonical Path Security.
+Version: 13.0.0 (God-Tier UI / Flawless Architecture)
+Description: Ultimate Glassmorphism UI, 3D Player Avatars, Custom Modals, Pro Terminal.
 =========================================================================================
 """
 import os
@@ -44,40 +44,55 @@ SERVER_PROPERTIES_SCHEMA = [
     {"key": "motd", "label": "رسالة الترحيب (MOTD)", "type": "text", "default": "A Minecraft Server"},
     {"key": "max-players", "label": "أقصى عدد لاعبين", "type": "number", "default": "20"},
     {"key": "difficulty", "label": "مستوى الصعوبة", "type": "select", "options": ["peaceful", "easy", "normal", "hard"], "default": "easy"},
-    {"key": "pvp", "label": "القتال بين اللاعبين (PVP)", "type": "select", "options": ["true", "false"], "default": "true"},
-    {"key": "hardcore", "label": "وضع الهاردكور (موتة وحدة)", "type": "select", "options": ["true", "false"], "default": "false"},
+    {"key": "pvp", "label": "القتال بين اللاعبين (PVP)", "type": "boolean", "default": "true"},
+    {"key": "hardcore", "label": "وضع الهاردكور (موتة وحدة)", "type": "boolean", "default": "false"},
     {"key": "view-distance", "label": "مسافة الرؤية (Chunks)", "type": "number", "default": "10"},
     {"key": "simulation-distance", "label": "مسافة المحاكاة", "type": "number", "default": "10"},
     {"key": "level-seed", "label": "سيد العالم (Seed)", "type": "text", "default": ""},
-    {"key": "allow-nether", "label": "تفعيل النذر (Nether)", "type": "select", "options": ["true", "false"], "default": "true"},
-    {"key": "allow-flight", "label": "السماح بالطيران (يمنع الطرد)", "type": "select", "options": ["true", "false"], "default": "false"},
-    {"key": "enable-command-block", "label": "تفعيل الكوماند بلوك", "type": "select", "options": ["true", "false"], "default": "false"},
+    {"key": "allow-nether", "label": "تفعيل النذر (Nether)", "type": "boolean", "default": "true"},
+    {"key": "allow-flight", "label": "السماح بالطيران (يمنع الطرد)", "type": "boolean", "default": "false"},
+    {"key": "enable-command-block", "label": "تفعيل الكوماند بلوك", "type": "boolean", "default": "false"},
     {"key": "spawn-protection", "label": "حماية نقطة البداية (بلوكات)", "type": "number", "default": "16"},
-    {"key": "white-list", "label": "تفعيل القائمة البيضاء", "type": "select", "options": ["true", "false"], "default": "false"},
-    {"key": "force-gamemode", "label": "إجبار وضع اللعب عند الدخول", "type": "select", "options": ["true", "false"], "default": "false"},
+    {"key": "white-list", "label": "تفعيل القائمة البيضاء", "type": "boolean", "default": "false"},
+    {"key": "force-gamemode", "label": "إجبار وضع اللعب عند الدخول", "type": "boolean", "default": "false"},
     {"key": "max-build-height", "label": "أقصى ارتفاع للبناء", "type": "number", "default": "320"},
-    {"key": "enforce-secure-profile", "label": "تشفير الشات (يفضل False للمكرك)", "type": "select", "options": ["true", "false"], "default": "false"},
-    {"key": "spawn-monsters", "label": "ترسبن الوحوش", "type": "select", "options": ["true", "false"], "default": "true"},
-    {"key": "spawn-animals", "label": "ترسبن الحيوانات", "type": "select", "options": ["true", "false"], "default": "true"},
-    {"key": "spawn-npcs", "label": "ترسبن القرويين (NPCs)", "type": "select", "options": ["true", "false"], "default": "true"},
-    {"key": "generate-structures", "label": "توليد القرى والمعابد", "type": "select", "options": ["true", "false"], "default": "true"},
-    {"key": "online-mode", "label": "حسابات أصلية فقط (Online Mode)", "type": "select", "options": ["true", "false"], "default": "false"}
+    {"key": "enforce-secure-profile", "label": "تشفير الشات (يفضل False للمكرك)", "type": "boolean", "default": "false"},
+    {"key": "spawn-monsters", "label": "ترسبن الوحوش", "type": "boolean", "default": "true"},
+    {"key": "spawn-animals", "label": "ترسبن الحيوانات", "type": "boolean", "default": "true"},
+    {"key": "spawn-npcs", "label": "ترسبن القرويين (NPCs)", "type": "boolean", "default": "true"},
+    {"key": "generate-structures", "label": "توليد القرى والمعابد", "type": "boolean", "default": "true"},
+    {"key": "online-mode", "label": "حسابات أصلية فقط (Online Mode)", "type": "boolean", "default": "false"}
 ]
 # =========================================================================================
 # 3. ENTERPRISE CLASSES (OOP ARCHITECTURE)
 # =========================================================================================
+def get_container_ram_percent():
+    try:
+        with open('/sys/fs/cgroup/memory.current', 'r') as f: used = int(f.read().strip())
+        with open('/sys/fs/cgroup/memory.max', 'r') as f:
+            max_val = f.read().strip()
+            if max_val == 'max': return psutil.virtual_memory().percent
+            total = int(max_val)
+        return round((used / total) * 100, 1)
+    except:
+        try:
+            with open('/sys/fs/cgroup/memory/memory.usage_in_bytes', 'r') as f: used = int(f.read().strip())
+            with open('/sys/fs/cgroup/memory/memory.limit_in_bytes', 'r') as f: total = int(f.read().strip())
+            return round((used / total) * 100, 1)
+        except:
+            return psutil.virtual_memory().percent
 class LoggerManager:
     def __init__(self):
         self.logs = deque(maxlen=MAX_LOG_LINES)
         self.lock = threading.Lock()
-    def log(self, source: str, message: str, is_safe: bool = False, color: str = "#64748b"):
+    def log(self, source: str, message: str, is_safe: bool = False, color: str = "#94a3b8"):
         with self.lock:
             timestamp = datetime.now().strftime("%H:%M:%S")
             clean_msg = ANSI_ESCAPE.sub('', message.strip())
             if not clean_msg: return
             if not is_safe: clean_msg = html.escape(clean_msg)
-            source_color = {"النظام": "#38bdf8", "Minecraft": "#a3e635", "Playit": "#f59e0b", "أنت": "#f472b6", "Watchdog": "#ef4444", "Backup": "#8b5cf6"}.get(source, color)
-            formatted_msg = f"<span style='color:#64748b;'>[{timestamp}]</span> <b style='color:{source_color};'>[{source}]</b> {clean_msg}"
+            source_color = {"النظام": "#0ea5e9", "Minecraft": "#10b981", "Playit": "#f59e0b", "أنت": "#ec4899", "Watchdog": "#ef4444", "Backup": "#8b5cf6"}.get(source, color)
+            formatted_msg = f"<span class='log-time'>[{timestamp}]</span> <span class='log-source' style='color:{source_color};'>[{source}]</span> <span class='log-msg'>{clean_msg}</span>"
             self.logs.append(formatted_msg)
     def get_logs(self) -> list:
         with self.lock: return list(self.logs)
@@ -112,11 +127,6 @@ class SecurityManager:
             raise PermissionError("Security Violation: Path Traversal Attempted")
         return target_path
 class EnterpriseStorageManager:
-    """
-    🔥 المحرك السري: نظام المزامنة الفيزيائية ثنائية الاتجاه 🔥
-    هذا الكلاس يكسر حماية الجافا (Canonical Path) الخاصة بـ WorldEdit
-    عن طريق إلغاء الـ Symlinks ونسخ الملفات فيزيائياً للذاكرة السريعة.
-    """
     def __init__(self, logger: LoggerManager):
         self.logger = logger
         self.data_config = os.path.join(DATA_DIR, "config")
@@ -124,26 +134,27 @@ class EnterpriseStorageManager:
     def hydrate_to_ram(self):
         self.logger.log("النظام", "🔄 جاري تفعيل محرك المزامنة الفيزيائية لكسر حماية WorldEdit...", is_safe=True)
         os.makedirs(self.data_config, exist_ok=True)
-
-        # تدمير أي Symlink قديم يسبب المشكلة
-        if os.path.islink(self.app_config):
-            os.remove(self.app_config)
-        elif os.path.exists(self.app_config):
-            shutil.rmtree(self.app_config)
-
-        # النسخ الفيزيائي العميق (Deep Physical Copy)
+        if os.path.islink(self.app_config): os.remove(self.app_config)
+        elif os.path.exists(self.app_config): shutil.rmtree(self.app_config)
         try:
             shutil.copytree(self.data_config, self.app_config, dirs_exist_ok=True)
             self.logger.log("النظام", "✅ تم بناء الملفات الفيزيائية بنجاح. WorldEdit الآن أعمى عن الـ Bucket!", is_safe=True)
         except Exception as e:
             self.logger.log("النظام", f"❌ خطأ في المزامنة الفيزيائية: {e}", is_safe=True)
     def dehydrate_to_disk(self):
-        # مزامنة عكسية لحفظ أي بيت جديد تبنيه أو إعدادات تتغير
-        if os.path.exists(self.app_config):
-            try:
-                shutil.copytree(self.app_config, self.data_config, dirs_exist_ok=True)
-            except:
-                pass
+        if not os.path.exists(self.app_config): return
+        try:
+            shutil.copytree(self.app_config, self.data_config, dirs_exist_ok=True)
+            for root, dirs, files in os.walk(self.data_config):
+                rel_path = os.path.relpath(root, self.data_config)
+                app_root = os.path.join(self.app_config, rel_path)
+                for file in files:
+                    if not os.path.exists(os.path.join(app_root, file)):
+                        os.remove(os.path.join(root, file))
+                for d in dirs:
+                    if not os.path.exists(os.path.join(app_root, d)):
+                        shutil.rmtree(os.path.join(root, d))
+        except: pass
 class PlayitDaemon:
     def __init__(self, logger: LoggerManager):
         self.process = None
@@ -224,14 +235,12 @@ class MinecraftDaemon:
             self.logger.log("النظام", f"⚠️ تحذير أثناء ربط {os.path.basename(dst)}: {html.escape(str(e))}", is_safe=True)
     def setup_environment(self):
         self.logger.log("النظام", "🛠️ جاري تهيئة بيئة السيرفر (Enterprise Secure Mode)...", is_safe=True)
-
-        # إنشاء المجلدات الأساسية في الـ Bucket
         for d in ['world', 'mods', 'config', 'backups', 'logs', 'crash-reports']:
             os.makedirs(os.path.join(DATA_DIR, d), exist_ok=True)
         os.makedirs(APP_DIR, exist_ok=True)
-        # ربط العالم فقط (لأن ماين كرافت العادية ما بيها حماية WorldEdit)
         self.force_symlink(os.path.join(DATA_DIR, "world"), os.path.join(APP_DIR, "world"))
-        # ربط ملفات الإعدادات الأساسية
+        self.force_symlink(os.path.join(DATA_DIR, "logs"), os.path.join(APP_DIR, "logs"))
+        self.force_symlink(os.path.join(DATA_DIR, "crash-reports"), os.path.join(APP_DIR, "crash-reports"))
         files_to_link = ['server.properties', 'ops.json', 'banned-players.json', 'banned-ips.json', 'whitelist.json', 'usercache.json']
         for f in files_to_link:
             file_path = os.path.join(DATA_DIR, f)
@@ -241,7 +250,6 @@ class MinecraftDaemon:
                     elif f.endswith('.json'): file.write("[]\n")
             self.force_symlink(file_path, os.path.join(APP_DIR, f))
         with open(os.path.join(APP_DIR, "eula.txt"), 'w') as f: f.write("eula=true\n")
-        # تحميل Fabric
         fabric_jar = os.path.join(APP_DIR, "fabric-server-launch.jar")
         if not os.path.exists(fabric_jar):
             self.logger.log("النظام", "⬇️ جاري تحميل وتثبيت محرك Fabric (1.20.4)...", is_safe=True)
@@ -249,10 +257,7 @@ class MinecraftDaemon:
             subprocess.run(["wget", "-q", "-O", installer_path, "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.jar"])
             subprocess.run(["java", "-jar", "fabric-installer.jar", "server", "-mcversion", "1.20.4", "-loader", "0.15.7", "-downloadMinecraft"], cwd=APP_DIR)
             if os.path.exists(installer_path): os.remove(installer_path)
-
-        # 🔥 تشغيل محرك المزامنة الفيزيائية للـ Config (الحل الجذري لـ WorldEdit) 🔥
         self.storage_mgr.hydrate_to_ram()
-
         self.logger.log("النظام", "✅ تمت التهيئة بنجاح. البيئة جاهزة.", is_safe=True)
     def start_async(self):
         if self.is_running(): return
@@ -262,15 +267,12 @@ class MinecraftDaemon:
     def _run(self):
         self.setup_environment()
         self.online_players.clear()
-
-        # النسخ الفيزيائي للمودات
         real_mods_dir = os.path.join(APP_DIR, "mods")
         data_mods_dir = os.path.join(DATA_DIR, "mods")
         os.makedirs(real_mods_dir, exist_ok=True)
         for f in os.listdir(real_mods_dir):
             file_path = os.path.join(real_mods_dir, f)
-            if os.path.isfile(file_path) or os.path.islink(file_path):
-                os.remove(file_path)
+            if os.path.isfile(file_path) or os.path.islink(file_path): os.remove(file_path)
         if os.path.exists(data_mods_dir):
             for f in os.listdir(data_mods_dir):
                 if f.endswith('.jar'):
@@ -278,9 +280,7 @@ class MinecraftDaemon:
                     dst = os.path.join(real_mods_dir, f)
                     self.logger.log("النظام", f"📦 جاري استخراج المود للذاكرة السريعة: {f}", is_safe=True)
                     shutil.copy2(src, dst)
-        # توجيه الجافا للمجلد الفيزيائي الجديد
-        config_dir = os.path.join(APP_DIR, "config") # تم التغيير هنا لكسر الحماية
-
+        config_dir = os.path.join(APP_DIR, "config")
         java_args = [
             "java", "-Xms2G", "-Xmx5G",
             f"-Dfabric.modsDir={real_mods_dir}",
@@ -318,7 +318,7 @@ class MinecraftDaemon:
         finally:
             self.online_players.clear()
             self.process = None
-            self.storage_mgr.dehydrate_to_disk() # حفظ التغييرات عند التوقف
+            self.storage_mgr.dehydrate_to_disk()
     def send_command(self, cmd: str):
         if self.is_running() and cmd.strip():
             try:
@@ -353,8 +353,6 @@ class WatchdogDaemon:
         while True:
             time.sleep(WATCHDOG_CHECK_INTERVAL)
             sync_counter += 1
-
-            # مزامنة فيزيائية كل 60 ثانية لحفظ البيوت الجديدة
             if sync_counter >= 6:
                 self.storage_mgr.dehydrate_to_disk()
                 sync_counter = 0
@@ -442,7 +440,7 @@ def map_proxy(subpath=''):
 def status():
     return jsonify({
         "cpu": psutil.cpu_percent(),
-        "ram": psutil.virtual_memory().percent,
+        "ram": get_container_ram_percent(),
         "status": "شغال 🟢" if mc_server.is_running() else "متوقف 🔴",
         "logs": logger_mgr.get_logs(),
         "network": {"status": playit_net.status, "ip": playit_net.ip},
@@ -460,8 +458,11 @@ def send_command():
     cmd = request.form.get('cmd')
     if not cmd: return "Bad Request", 400
     if cmd.strip() == "!resetworld":
+        if mc_server.is_running():
+            logger_mgr.log("النظام", "❌ لا يمكنك فرمتة العالم والسيرفر يعمل! قم بإيقاف السيرفر أولاً.", is_safe=True)
+            return "OK"
         shutil.rmtree(os.path.join(DATA_DIR, "world"), ignore_errors=True)
-        logger_mgr.log("النظام", "💥 تم فرمتة العالم القديم بنجاح! أوقف السيرفر وشغله من جديد لتوليد عالم بالسيد الجديد.", is_safe=True)
+        logger_mgr.log("النظام", "💥 تم فرمتة العالم القديم بنجاح! شغل السيرفر لتوليد عالم جديد.", is_safe=True)
         return "OK"
     if cmd.strip().startswith("!installmod "):
         url = cmd.strip().split(" ", 1)[1]
@@ -500,13 +501,27 @@ def handle_mods():
                 os.remove(os.path.join(mods_path, safe_name))
             except: pass
         return "OK"
-    return jsonify([f for f in os.listdir(mods_path) if f.endswith('.jar')] if os.path.exists(mods_path) else [])
+
+    mods_list = []
+    if os.path.exists(mods_path):
+        for f in os.listdir(mods_path):
+            if f.endswith('.jar'):
+                size = os.path.getsize(os.path.join(mods_path, f))
+                mods_list.append({"name": f, "size": round(size / (1024 * 1024), 2)})
+    return jsonify(mods_list)
 @app.route('/api/backup', methods=['GET', 'POST'])
 def handle_backup_route():
     if request.method == 'POST':
         backup_mgr.create_backup_async()
         return "Started"
-    return jsonify(backup_mgr.get_backups_list())
+
+    backups = []
+    if os.path.exists(backup_mgr.backup_dir):
+        for f in os.listdir(backup_mgr.backup_dir):
+            if f.endswith('.zip'):
+                size = os.path.getsize(os.path.join(backup_mgr.backup_dir, f))
+                backups.append({"name": f, "size": round(size / (1024 * 1024), 2)})
+    return jsonify(sorted(backups, key=lambda x: x['name'], reverse=True))
 @app.route('/api/backup/download/<filename>')
 def download_backup(filename):
     safe_name = secure_filename(filename)
@@ -560,17 +575,18 @@ def file_manager():
         for file in files:
             if file.endswith(('.json', '.properties', '.txt', '.log', '.schem', '.schematic')):
                 rel_path = os.path.relpath(os.path.join(root, file), DATA_DIR)
-                file_list.append(rel_path)
+                size = os.path.getsize(os.path.join(root, file))
+                file_list.append({"name": rel_path, "size": round(size / 1024, 2)})
     return jsonify(file_list)
 @app.route('/api/crash')
 def get_crash():
-    crash_dir = os.path.join(APP_DIR, "crash-reports")
+    crash_dir = os.path.join(DATA_DIR, "crash-reports")
     if not os.path.exists(crash_dir): return "لا توجد كراشات."
     crashes = sorted([f for f in os.listdir(crash_dir) if f.endswith('.txt')], reverse=True)
     if not crashes: return "السيرفر مستقر، لا توجد تقارير كراش."
     with open(os.path.join(crash_dir, crashes[0]), 'r') as f: return html.escape(f.read())
 # =========================================================================================
-# 6. HTML/CSS/JS TEMPLATES (THE FRONTEND)
+# 6. HTML/CSS/JS TEMPLATES (THE FRONTEND - GOD TIER UI)
 # =========================================================================================
 LOGIN_HTML = """
 <!DOCTYPE html>
@@ -578,49 +594,40 @@ LOGIN_HTML = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تسجيل الدخول | Enterprise Panel</title>
+    <title>Enterprise Panel | Login</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background: radial-gradient(circle at top, #0f172a, #020617); color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; overflow: hidden;}
-        .login-container { background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(15px); padding: 50px 40px; border-radius: 24px; box-shadow: 0 25px 50px rgba(0,0,0,0.7); text-align: center; width: 90%; max-width: 420px; border: 1px solid rgba(255,255,255,0.05); position: relative; z-index: 10;}
-        .logo-icon { font-size: 50px; margin-bottom: 10px; display: block; animation: float 3s ease-in-out infinite; }
-        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
-        h2 { margin-top: 0; color: #38bdf8; font-size: 28px; margin-bottom: 30px; text-shadow: 0 2px 15px rgba(56, 189, 248, 0.4); font-weight: 800; letter-spacing: 1px;}
-        input { width: 100%; padding: 16px; margin-bottom: 25px; border-radius: 12px; border: 2px solid #334155; background: rgba(15, 23, 42, 0.9); color: white; text-align: center; font-size: 18px; outline: none; transition: all 0.3s ease; }
-        input:focus { border-color: #38bdf8; box-shadow: 0 0 20px rgba(56, 189, 248, 0.3); transform: scale(1.02);}
-        button { width: 100%; padding: 16px; background: linear-gradient(135deg, #0ea5e9, #2563eb); color: white; border: none; border-radius: 12px; cursor: pointer; font-size: 18px; font-weight: bold; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4); text-transform: uppercase; letter-spacing: 1px;}
-        button:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(14, 165, 233, 0.6); }
+        :root { --bg: #050505; --primary: #3b82f6; --primary-glow: rgba(59, 130, 246, 0.5); --surface: rgba(20, 20, 20, 0.7); --text: #f8fafc; }
+        * { box-sizing: border-box; font-family: 'Cairo', sans-serif; }
+        body { background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; overflow: hidden; }
+        .bg-animation { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; background: radial-gradient(circle at 50% 50%, #1e1b4b 0%, #050505 100%); }
+        .login-box { position: relative; z-index: 1; background: var(--surface); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); padding: 3rem; border-radius: 24px; border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5), 0 0 40px var(--primary-glow); width: 100%; max-width: 420px; text-align: center; transform: translateY(20px); opacity: 0; animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes slideUp { to { transform: translateY(0); opacity: 1; } }
+        .logo { font-size: 4rem; margin-bottom: 1rem; display: inline-block; filter: drop-shadow(0 0 15px var(--primary)); animation: float 3s ease-in-out infinite; }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        h1 { margin: 0 0 2rem 0; font-weight: 900; font-size: 2rem; background: linear-gradient(to right, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .input-group { position: relative; margin-bottom: 2rem; }
+        input { width: 100%; padding: 1rem 1.5rem; background: rgba(0,0,0,0.5); border: 2px solid rgba(255,255,255,0.1); border-radius: 12px; color: white; font-size: 1.1rem; outline: none; transition: all 0.3s ease; text-align: center; letter-spacing: 2px; }
+        input:focus { border-color: var(--primary); box-shadow: 0 0 20px var(--primary-glow); }
+        button { width: 100%; padding: 1rem; background: linear-gradient(135deg, #2563eb, #7c3aed); color: white; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: 700; cursor: pointer; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 1px; position: relative; overflow: hidden; }
+        button:hover { transform: translateY(-2px); box-shadow: 0 10px 25px var(--primary-glow); }
         button:active { transform: translateY(1px); }
-        .error-msg { color: #ef4444; margin-bottom: 20px; font-weight: bold; background: rgba(239, 68, 68, 0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.3);}
-        .particles { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+        .error { color: #ef4444; background: rgba(239, 68, 68, 0.1); padding: 0.75rem; border-radius: 8px; margin-bottom: 1.5rem; font-weight: 700; border: 1px solid rgba(239, 68, 68, 0.3); }
     </style>
 </head>
 <body>
-    <div class="particles" id="particles"></div>
-    <div class="login-container">
-        <span class="logo-icon">🛡️</span>
-        <h2>Enterprise Panel</h2>
-        {% if error %}<div class="error-msg">{{ error }}</div>{% endif %}
-        <form action="/login" method="POST">
-            <input type="password" name="password" placeholder="أدخل مفتاح التشفير..." required autofocus>
-            <button type="submit">تسجيل الدخول الآمن</button>
+    <div class="bg-animation"></div>
+    <div class="login-box">
+        <div class="logo">💠</div>
+        <h1>Enterprise Panel</h1>
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+        <form action="/login" method="POST" onsubmit="this.querySelector('button').innerHTML = 'جاري التشفير... ⏳';">
+            <div class="input-group">
+                <input type="password" name="password" placeholder="أدخل مفتاح التشفير" required autofocus>
+            </div>
+            <button type="submit">تسجيل الدخول</button>
         </form>
     </div>
-    <script>
-        const canvas = document.createElement('canvas');
-        document.getElementById('particles').appendChild(canvas);
-        const ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-        const particlesArray = [];
-        class Particle {
-            constructor() { this.x = Math.random() * canvas.width; this.y = Math.random() * canvas.height; this.size = Math.random() * 3 + 1; this.speedX = Math.random() * 1 - 0.5; this.speedY = Math.random() * 1 - 0.5; }
-            update() { this.x += this.speedX; this.y += this.speedY; if (this.size > 0.2) this.size -= 0.01; }
-            draw() { ctx.fillStyle = 'rgba(56, 189, 248, 0.5)'; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); }
-        }
-        function init() { for (let i = 0; i < 100; i++) particlesArray.push(new Particle()); }
-        function animate() { ctx.clearRect(0, 0, canvas.width, canvas.height); for (let i = 0; i < particlesArray.length; i++) { particlesArray[i].update(); particlesArray[i].draw(); if (particlesArray[i].size <= 0.2) { particlesArray.splice(i, 1); i--; particlesArray.push(new Particle()); } } requestAnimationFrame(animate); }
-        init(); animate();
-    </script>
 </body>
 </html>
 """
@@ -630,243 +637,406 @@ DASHBOARD_HTML = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة تحكم السيرفر | Enterprise Edition</title>
+    <title>Enterprise Dashboard | God-Tier</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --bg-main: #0f172a; --bg-card: #1e293b; --bg-input: #020617; --text-main: #f8fafc; --text-muted: #94a3b8; --primary: #0ea5e9; --primary-hover: #0284c7; --success: #10b981; --danger: #ef4444; --warning: #f59e0b; --border: #334155; }
-        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background: var(--bg-main); color: var(--text-main); margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; }
-        .sidebar { width: 260px; background: var(--bg-card); border-left: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px 0; transition: 0.3s; z-index: 100;}
-        .sidebar-header { padding: 0 20px 20px; border-bottom: 1px solid var(--border); margin-bottom: 20px; text-align: center; }
-        .sidebar-header h2 { margin: 0; color: var(--primary); font-size: 22px; text-shadow: 0 2px 10px rgba(14, 165, 233, 0.3); }
-        .nav-item { padding: 15px 25px; color: var(--text-muted); cursor: pointer; font-weight: bold; transition: 0.3s; display: flex; align-items: center; gap: 10px; border-right: 4px solid transparent; }
-        .nav-item:hover { background: rgba(14, 165, 233, 0.1); color: var(--text-main); }
-        .nav-item.active { background: rgba(14, 165, 233, 0.15); color: var(--primary); border-right-color: var(--primary); }
-        .main-content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 20px; }
-        .top-header { display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 15px 25px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-        .network-box { display: flex; align-items: center; gap: 10px; background: var(--bg-input); padding: 8px 15px; border-radius: 8px; border: 1px solid var(--border); }
-        .ip-badge { font-weight: bold; font-size: 16px; letter-spacing: 1px; }
-        .ip-connected { color: var(--success); }
-        .ip-error { color: var(--danger); }
-        .btn-copy { background: var(--border); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; transition: 0.3s; font-size: 12px; }
-        .btn-copy:hover { background: #475569; }
-        .btn-logout { background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid var(--danger); padding: 8px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; transition: 0.3s; }
-        .btn-logout:hover { background: var(--danger); color: white; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 20px; }
-        .stat-card { background: var(--bg-card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden;}
-        .stat-title { color: var(--text-muted); font-size: 14px; margin-bottom: 10px; text-transform: uppercase; font-weight: bold; z-index: 2;}
-        .stat-value { font-size: 32px; font-weight: 900; color: var(--text-main); z-index: 2;}
-        .status-online { color: var(--success); text-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
-        .status-offline { color: var(--danger); }
-        .chart-container { position: absolute; bottom: 0; left: 0; width: 100%; height: 60px; opacity: 0.3; z-index: 1;}
-        .tab-content { display: none; background: var(--bg-card); padding: 25px; border-radius: 12px; border: 1px solid var(--border); animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1); flex: 1; }
-        .tab-content.active { display: flex; flex-direction: column; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .console-wrapper { background: var(--bg-input); border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; flex: 1; min-height: 400px;}
-        .console-output { padding: 15px; flex: 1; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 14px; color: #a3e635; direction: ltr; text-align: left; line-height: 1.6; }
-        .console-input-area { display: flex; border-top: 1px solid var(--border); background: rgba(255,255,255,0.02);}
-        .console-input { flex: 1; background: transparent; border: none; padding: 15px; color: white; font-family: monospace; font-size: 15px; outline: none; }
-        .console-btn { background: var(--primary); color: white; border: none; padding: 0 30px; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        .console-btn:hover { background: var(--primary-hover); }
-        .action-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: white; transition: 0.3s; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;}
-        .btn-green { background: var(--success); } .btn-green:hover { background: #059669; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);}
-        .btn-red { background: var(--danger); } .btn-red:hover { background: #dc2626; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);}
-        .btn-blue { background: var(--primary); } .btn-blue:hover { background: var(--primary-hover); box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4);}
-        .btn-orange { background: var(--warning); } .btn-orange:hover { background: #d97706; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);}
-        .list-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg-input); padding: 15px 20px; border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border); transition: 0.2s; }
-        .list-item:hover { border-color: #475569; transform: translateX(-5px);}
-        .list-item-title { font-weight: bold; font-size: 16px; display: flex; align-items: center; gap: 10px;}
-        .list-actions { display: flex; gap: 8px; }
-        .config-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; max-height: 60vh; overflow-y: auto; padding-right: 10px;}
-        .config-row { display: flex; flex-direction: column; background: var(--bg-input); padding: 15px; border-radius: 8px; border: 1px solid var(--border); transition: 0.3s;}
-        .config-row:focus-within { border-color: var(--primary); box-shadow: 0 0 10px rgba(14, 165, 233, 0.2);}
-        .config-row span { margin-bottom: 8px; font-weight: bold; color: var(--text-main); font-size: 14px; }
-        .config-row select, .config-row input { width: 100%; background: var(--bg-card); color: white; border: 1px solid var(--border); padding: 10px; border-radius: 6px; outline: none; font-weight: bold; transition: 0.3s; }
-        .config-row input:focus, .config-row select:focus { border-color: var(--primary); }
-        .file-viewer { background: var(--bg-input); color: #e2e8f0; padding: 20px; border-radius: 8px; font-family: 'Consolas', monospace; white-space: pre-wrap; max-height: 500px; overflow-y: auto; direction: ltr; text-align: left; border: 1px solid var(--border); margin-top: 15px; display: none; font-size: 14px; line-height: 1.5;}
-        #toast-container { position: fixed; bottom: 20px; left: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
-        .toast { background: var(--bg-card); color: white; padding: 15px 25px; border-radius: 8px; border-right: 4px solid var(--primary); box-shadow: 0 10px 25px rgba(0,0,0,0.5); animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards; font-weight: bold; display: flex; align-items: center; gap: 10px;}
+        :root {
+            --bg-base: #09090b; --bg-surface: #18181b; --bg-glass: rgba(24, 24, 27, 0.6);
+            --border: rgba(255, 255, 255, 0.08); --border-hover: rgba(255, 255, 255, 0.15);
+            --text-main: #f8fafc; --text-muted: #94a3b8;
+            --primary: #3b82f6; --primary-hover: #2563eb; --primary-glow: rgba(59, 130, 246, 0.4);
+            --success: #10b981; --success-glow: rgba(16, 185, 129, 0.4);
+            --danger: #ef4444; --danger-glow: rgba(239, 68, 68, 0.4);
+            --warning: #f59e0b; --info: #0ea5e9;
+            --radius-lg: 16px; --radius-md: 12px; --radius-sm: 8px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Cairo', sans-serif; background: var(--bg-base); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
+
+        /* Scrollbar */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: var(--bg-input); border-radius: 4px;}
-        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
-        @media (max-width: 768px) {
+        ::-webkit-scrollbar-track { background: var(--bg-base); }
+        ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+        /* Sidebar */
+        .sidebar { width: 280px; background: var(--bg-surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; z-index: 100; transition: var(--transition); }
+        .brand { padding: 24px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); }
+        .brand i { font-size: 28px; color: var(--primary); filter: drop-shadow(0 0 8px var(--primary-glow)); }
+        .brand h2 { font-size: 20px; font-weight: 800; letter-spacing: 1px; background: linear-gradient(90deg, #fff, #94a3b8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .nav-menu { padding: 16px 12px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .nav-item { padding: 14px 16px; border-radius: var(--radius-md); cursor: pointer; display: flex; align-items: center; gap: 14px; color: var(--text-muted); font-weight: 600; transition: var(--transition); border: 1px solid transparent; }
+        .nav-item i { font-size: 18px; width: 24px; text-align: center; }
+        .nav-item:hover { background: rgba(255,255,255,0.03); color: var(--text-main); border-color: var(--border); transform: translateX(-4px); }
+        .nav-item.active { background: linear-gradient(90deg, rgba(59,130,246,0.15), transparent); color: var(--primary); border-color: var(--primary-glow); border-right: 3px solid var(--primary); }
+
+        /* Main Content */
+        .main-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        .bg-glow { position: absolute; top: -20%; left: -10%; width: 50%; height: 50%; background: radial-gradient(circle, var(--primary-glow) 0%, transparent 70%); filter: blur(100px); z-index: 0; pointer-events: none; opacity: 0.5; }
+
+        /* Header */
+        .header { padding: 20px 32px; display: flex; justify-content: space-between; align-items: center; background: var(--bg-glass); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); z-index: 10; }
+        .network-pill { display: flex; align-items: center; gap: 12px; background: rgba(0,0,0,0.4); padding: 8px 16px; border-radius: 50px; border: 1px solid var(--border); }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 10px var(--danger-glow); }
+        .status-dot.online { background: var(--success); box-shadow: 0 0 10px var(--success-glow); animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 var(--success-glow); } 70% { box-shadow: 0 0 0 10px rgba(16,185,129,0); } 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); } }
+        .ip-text { font-family: 'Fira Code', monospace; font-weight: 600; font-size: 15px; letter-spacing: 0.5px; }
+        .btn-icon { background: transparent; border: 1px solid var(--border); color: var(--text-main); width: 36px; height: 36px; border-radius: 50%; cursor: pointer; transition: var(--transition); display: flex; justify-content: center; align-items: center; }
+        .btn-icon:hover { background: var(--border-hover); transform: scale(1.1); }
+        .btn-logout { background: rgba(239,68,68,0.1); color: var(--danger); border: 1px solid rgba(239,68,68,0.2); padding: 8px 20px; border-radius: 50px; text-decoration: none; font-weight: 600; transition: var(--transition); display: flex; align-items: center; gap: 8px; }
+        .btn-logout:hover { background: var(--danger); color: white; box-shadow: 0 4px 15px var(--danger-glow); }
+        /* Content Area */
+        .content { flex: 1; padding: 32px; overflow-y: auto; z-index: 1; position: relative; }
+        .tab-pane { display: none; animation: fadeUp 0.4s ease forwards; }
+        .tab-pane.active { display: block; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Stats Grid */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; margin-bottom: 32px; }
+        .stat-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px; position: relative; overflow: hidden; transition: var(--transition); }
+        .stat-card:hover { border-color: var(--border-hover); transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .stat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; color: var(--text-muted); font-weight: 600; font-size: 14px; }
+        .stat-header i { font-size: 20px; color: var(--primary); }
+        .stat-value { font-size: 36px; font-weight: 800; font-family: 'Fira Code', monospace; }
+        .chart-bg { position: absolute; bottom: 0; left: 0; width: 100%; height: 60px; opacity: 0.2; }
+        /* Buttons */
+        .btn { padding: 12px 24px; border-radius: var(--radius-md); border: none; font-weight: 700; font-family: 'Cairo'; cursor: pointer; transition: var(--transition); display: inline-flex; align-items: center; gap: 10px; font-size: 15px; color: white; }
+        .btn-primary { background: linear-gradient(135deg, var(--primary), #6366f1); box-shadow: 0 4px 15px var(--primary-glow); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 25px var(--primary-glow); }
+        .btn-success { background: linear-gradient(135deg, var(--success), #059669); box-shadow: 0 4px 15px var(--success-glow); }
+        .btn-danger { background: linear-gradient(135deg, var(--danger), #dc2626); box-shadow: 0 4px 15px var(--danger-glow); }
+        .btn-warning { background: linear-gradient(135deg, var(--warning), #d97706); }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-main); }
+        .btn-outline:hover { background: var(--border-hover); }
+        /* Console */
+        .console-container { background: #000; border: 1px solid var(--border); border-radius: var(--radius-lg); display: flex; flex-direction: column; height: 60vh; box-shadow: inset 0 0 20px rgba(0,0,0,0.8); overflow: hidden; }
+        .console-header { background: #111; padding: 12px 20px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; }
+        .console-title { font-family: 'Fira Code', monospace; font-size: 13px; color: #888; display: flex; align-items: center; gap: 8px; }
+        .console-title i { color: var(--primary); }
+        .console-output { flex: 1; padding: 20px; overflow-y: auto; font-family: 'Fira Code', monospace; font-size: 14px; line-height: 1.6; color: #ccc; direction: ltr; text-align: left; }
+        .log-time { color: #555; } .log-source { font-weight: bold; } .log-msg { color: #ddd; }
+        .console-input-wrapper { display: flex; background: #111; border-top: 1px solid #222; padding: 10px; }
+        .console-prefix { padding: 10px; color: var(--primary); font-family: 'Fira Code'; font-weight: bold; }
+        .console-input { flex: 1; background: transparent; border: none; color: #fff; font-family: 'Fira Code', monospace; font-size: 15px; outline: none; }
+        /* Player Grid */
+        .player-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .player-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 15px; transition: var(--transition); position: relative; overflow: hidden; }
+        .player-card:hover { border-color: var(--primary); transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
+        .player-head { width: 80px; height: 80px; border-radius: 12px; image-rendering: pixelated; box-shadow: 0 8px 16px rgba(0,0,0,0.5); border: 2px solid rgba(255,255,255,0.1); }
+        .player-name { font-size: 18px; font-weight: 800; font-family: 'Fira Code'; }
+        .player-actions { display: flex; gap: 8px; width: 100%; justify-content: center; flex-wrap: wrap; }
+        .player-actions .btn { padding: 8px 12px; font-size: 12px; flex: 1; min-width: 80px; justify-content: center; }
+        /* Lists (Mods, Files, Backups) */
+        .data-list { display: flex; flex-direction: column; gap: 12px; }
+        .data-item { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; transition: var(--transition); }
+        .data-item:hover { border-color: var(--border-hover); background: rgba(255,255,255,0.02); }
+        .data-info { display: flex; align-items: center; gap: 16px; }
+        .data-icon { width: 40px; height: 40px; border-radius: 10px; background: rgba(255,255,255,0.05); display: flex; justify-content: center; align-items: center; font-size: 20px; color: var(--primary); }
+        .data-name { font-weight: 700; font-size: 16px; font-family: 'Fira Code'; direction: ltr; }
+        .data-meta { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+        /* Drag & Drop Zone */
+        .drop-zone { border: 2px dashed var(--border); border-radius: var(--radius-lg); padding: 40px; text-align: center; background: rgba(0,0,0,0.2); cursor: pointer; transition: var(--transition); margin-bottom: 24px; }
+        .drop-zone:hover, .drop-zone.dragover { border-color: var(--primary); background: rgba(59,130,246,0.05); }
+        .drop-zone i { font-size: 48px; color: var(--primary); margin-bottom: 16px; }
+        .drop-zone p { font-size: 16px; color: var(--text-muted); }
+        /* Settings Toggles */
+        .settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; }
+        .setting-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 20px; display: flex; justify-content: space-between; align-items: center; transition: var(--transition); }
+        .setting-card:focus-within { border-color: var(--primary); }
+        .setting-info h4 { font-size: 15px; margin-bottom: 4px; }
+        .setting-info p { font-size: 12px; color: var(--text-muted); font-family: 'Fira Code'; }
+
+        /* Custom Toggle Switch */
+        .switch { position: relative; display: inline-block; width: 50px; height: 28px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.1); transition: .4s; border-radius: 34px; border: 1px solid var(--border); }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+        input:checked + .slider { background-color: var(--success); border-color: var(--success); }
+        input:checked + .slider:before { transform: translateX(22px); }
+
+        /* Custom Inputs */
+        .custom-input { background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: white; padding: 8px 12px; border-radius: 6px; outline: none; font-family: 'Fira Code'; width: 120px; text-align: center; transition: 0.3s; }
+        .custom-input:focus { border-color: var(--primary); }
+        .custom-select { background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: white; padding: 8px 12px; border-radius: 6px; outline: none; font-family: 'Cairo'; font-weight: bold; cursor: pointer; }
+        /* Custom Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); z-index: 9999; display: flex; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: 0.3s; }
+        .modal-overlay.active { opacity: 1; pointer-events: all; }
+        .modal-box { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 32px; width: 90%; max-width: 400px; text-align: center; transform: scale(0.9); transition: 0.3s; box-shadow: 0 25px 50px rgba(0,0,0,0.5); }
+        .modal-overlay.active .modal-box { transform: scale(1); }
+        .modal-icon { font-size: 48px; margin-bottom: 16px; }
+        .modal-title { font-size: 22px; font-weight: 800; margin-bottom: 12px; }
+        .modal-desc { color: var(--text-muted); margin-bottom: 24px; font-size: 15px; }
+        .modal-actions { display: flex; gap: 12px; justify-content: center; }
+        .modal-actions .btn { flex: 1; justify-content: center; }
+        /* Toasts */
+        #toast-container { position: fixed; bottom: 24px; left: 24px; z-index: 10000; display: flex; flex-direction: column; gap: 12px; }
+        .toast { background: var(--bg-surface); border: 1px solid var(--border); padding: 16px 24px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); animation: slideRight 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; position: relative; overflow: hidden; }
+        @keyframes slideRight { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .toast-icon { font-size: 20px; }
+        .toast-success .toast-icon { color: var(--success); }
+        .toast-error .toast-icon { color: var(--danger); }
+        .toast-info .toast-icon { color: var(--info); }
+        .toast-progress { position: absolute; bottom: 0; left: 0; height: 3px; background: var(--primary); width: 100%; animation: progress 4s linear forwards; }
+        @keyframes progress { to { width: 0; } }
+        /* File Viewer */
+        .file-viewer-container { display: none; margin-top: 20px; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+        .file-viewer-header { background: #111; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #222; }
+        .file-viewer-content { background: #000; padding: 20px; color: #e2e8f0; font-family: 'Fira Code', monospace; font-size: 14px; white-space: pre-wrap; max-height: 500px; overflow-y: auto; direction: ltr; text-align: left; }
+        @media (max-width: 900px) {
             body { flex-direction: column; }
             .sidebar { width: 100%; height: auto; flex-direction: row; overflow-x: auto; padding: 10px; border-left: none; border-bottom: 1px solid var(--border); }
-            .sidebar-header { display: none; }
-            .nav-item { padding: 10px 15px; border-right: none; border-bottom: 3px solid transparent; white-space: nowrap;}
-            .nav-item.active { border-right: none; border-bottom-color: var(--primary); }
-            .stats-grid { grid-template-columns: 1fr; }
+            .brand { display: none; }
+            .nav-menu { flex-direction: row; padding: 0; }
+            .nav-item { white-space: nowrap; border-right: none; border-bottom: 3px solid transparent; }
+            .nav-item.active { border-right: none; border-bottom-color: var(--primary); background: linear-gradient(0deg, rgba(59,130,246,0.15), transparent); }
+            .header { flex-direction: column; gap: 15px; }
         }
     </style>
 </head>
 <body>
+    <!-- Custom Modal -->
+    <div class="modal-overlay" id="custom-modal">
+        <div class="modal-box">
+            <div class="modal-icon" id="modal-icon">⚠️</div>
+            <h3 class="modal-title" id="modal-title">تأكيد الإجراء</h3>
+            <p class="modal-desc" id="modal-desc">هل أنت متأكد من هذا الإجراء؟</p>
+            <div class="modal-actions">
+                <button class="btn btn-outline" onclick="closeModal()">إلغاء</button>
+                <button class="btn btn-danger" id="modal-confirm">تأكيد</button>
+            </div>
+        </div>
+    </div>
     <div id="toast-container"></div>
     <div class="sidebar">
-        <div class="sidebar-header">
-            <h2>🛡️ Enterprise</h2>
+        <div class="brand">
+            <i class="fa-solid fa-shield-halved"></i>
+            <h2>Enterprise</h2>
         </div>
-        <div class="nav-item active" onclick="openTab('console', this)">💻 الكونسول والتحكم</div>
-        <div class="nav-item" onclick="openTab('livemap', this)">🗺️ الخريطة المباشرة</div>
-        <div class="nav-item" onclick="openTab('players', this)">👥 إدارة اللاعبين</div>
-        <div class="nav-item" onclick="openTab('mods', this); loadMods();">🧩 مدير المودات</div>
-        <div class="nav-item" onclick="openTab('files', this); loadFiles();">📁 مدير الملفات</div>
-        <div class="nav-item" onclick="openTab('backups', this); loadBackups();">💾 النسخ الاحتياطي</div>
-        <div class="nav-item" onclick="openTab('settings', this); loadConfig();">⚙️ إعدادات السيرفر</div>
-        <div class="nav-item" onclick="openTab('crashes', this); loadCrash();">⚠️ تقارير الكراش</div>
+        <div class="nav-menu">
+            <div class="nav-item active" onclick="openTab('dashboard', this)"><i class="fa-solid fa-chart-pie"></i> نظرة عامة</div>
+            <div class="nav-item" onclick="openTab('console', this)"><i class="fa-solid fa-terminal"></i> الكونسول</div>
+            <div class="nav-item" onclick="openTab('players', this)"><i class="fa-solid fa-users"></i> اللاعبين</div>
+            <div class="nav-item" onclick="openTab('mods', this); loadMods();"><i class="fa-solid fa-puzzle-piece"></i> المودات</div>
+            <div class="nav-item" onclick="openTab('files', this); loadFiles();"><i class="fa-solid fa-folder-open"></i> الملفات</div>
+            <div class="nav-item" onclick="openTab('backups', this); loadBackups();"><i class="fa-solid fa-box-archive"></i> النسخ الاحتياطي</div>
+            <div class="nav-item" onclick="openTab('settings', this); loadConfig();"><i class="fa-solid fa-sliders"></i> الإعدادات</div>
+            <div class="nav-item" onclick="openTab('livemap', this)"><i class="fa-solid fa-map-location-dot"></i> الخريطة</div>
+        </div>
     </div>
-    <div class="main-content">
-        <div class="top-header">
-            <div id="network-area" class="network-box">
-                <span class="ip-badge ip-connected" id="ip-display">جاري الاتصال...</span>
-                <button class="btn-copy" onclick="copyIP()">📋 نسخ</button>
+    <div class="main-wrapper">
+        <div class="bg-glow"></div>
+
+        <div class="header">
+            <div class="network-pill">
+                <div class="status-dot" id="net-dot"></div>
+                <span class="ip-text" id="ip-display">جاري الاتصال...</span>
+                <button class="btn-icon" onclick="copyIP()" title="نسخ الآي بي"><i class="fa-regular fa-copy"></i></button>
             </div>
-            <a href="/logout" class="btn-logout">تسجيل خروج 🚪</a>
-        </div>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-title">حالة السيرفر</div>
-                <div class="stat-value" id="status-text">جاري التحميل...</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-title">استهلاك المعالج (CPU)</div>
-                <div class="stat-value" id="cpu-text">0%</div>
-                <div class="chart-container"><canvas id="cpuChart"></canvas></div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-title">استهلاك الرام (RAM)</div>
-                <div class="stat-value" id="ram-text">0%</div>
-                <div class="chart-container"><canvas id="ramChart"></canvas></div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-title">اللاعبين المتصلين</div>
-                <div class="stat-value" id="players-count">0</div>
+            <div style="display: flex; gap: 15px;">
+                <button class="btn-icon" onclick="updateStatus()" title="تحديث البيانات"><i class="fa-solid fa-rotate-right"></i></button>
+                <a href="/logout" class="btn-logout"><i class="fa-solid fa-arrow-right-from-bracket"></i> خروج</a>
             </div>
         </div>
-        <div id="console" class="tab-content active">
-            <div class="action-bar">
-                <button class="btn btn-green" onclick="sendAction('start')">▶ تشغيل السيرفر</button>
-                <button class="btn btn-orange" onclick="sendAction('stop')">⏹ إيقاف آمن (حفظ)</button>
-                <button class="btn btn-red" onclick="sendAction('kill')">💀 إيقاف إجباري</button>
-                <button class="btn btn-blue" onclick="execCmd('!resetworld')" style="margin-right: auto;">💥 فرمتة العالم</button>
-            </div>
-            <div class="console-wrapper">
-                <div class="console-output" id="console-box"></div>
-                <div class="console-input-area">
-                    <input type="text" id="cmd" class="console-input" placeholder="اكتب أمر السيرفر هنا (مثال: time set day)..." onkeypress="if(event.key === 'Enter') sendCmd()">
-                    <button class="console-btn" onclick="sendCmd()">إرسال</button>
+        <div class="content">
+            <!-- Dashboard Tab -->
+            <div id="dashboard" class="tab-pane active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-header"><span>حالة السيرفر</span> <i class="fa-solid fa-server"></i></div>
+                        <div class="stat-value" id="status-text" style="font-family: 'Cairo';">جاري التحميل...</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header"><span>اللاعبين المتصلين</span> <i class="fa-solid fa-users"></i></div>
+                        <div class="stat-value" id="players-count">0<span style="font-size:16px; color:var(--text-muted)">/20</span></div>
+                    </div>
+                    <div class="stat-card" style="padding-bottom: 60px;">
+                        <div class="stat-header"><span>استهلاك المعالج</span> <i class="fa-solid fa-microchip"></i></div>
+                        <div class="stat-value" id="cpu-text">0%</div>
+                        <div class="chart-bg"><canvas id="cpuChart"></canvas></div>
+                    </div>
+                    <div class="stat-card" style="padding-bottom: 60px;">
+                        <div class="stat-header"><span>استهلاك الرام</span> <i class="fa-solid fa-memory"></i></div>
+                        <div class="stat-value" id="ram-text">0%</div>
+                        <div class="chart-bg"><canvas id="ramChart"></canvas></div>
+                    </div>
+                </div>
+
+                <h3 style="margin-bottom: 20px; font-weight: 800;">التحكم السريع</h3>
+                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                    <button class="btn btn-success" onclick="sendAction('start')"><i class="fa-solid fa-play"></i> تشغيل السيرفر</button>
+                    <button class="btn btn-warning" onclick="sendAction('stop')"><i class="fa-solid fa-stop"></i> إيقاف آمن</button>
+                    <button class="btn btn-danger" onclick="confirmAction('إيقاف إجباري', 'هل أنت متأكد؟ قد تفقد آخر التغييرات في العالم.', () => sendAction('kill'))"><i class="fa-solid fa-skull"></i> إيقاف إجباري</button>
+                    <button class="btn btn-outline" onclick="confirmAction('فرمتة العالم', 'تحذير خطير! سيتم مسح العالم بالكامل ولا يمكن التراجع. هل أنت متأكد؟', () => execCmd('!resetworld'))" style="color: var(--danger); border-color: var(--danger);"><i class="fa-solid fa-bomb"></i> فرمتة العالم</button>
                 </div>
             </div>
-        </div>
-        <div id="livemap" class="tab-content" style="padding: 0; overflow: hidden; display: none; flex-direction: column;">
-            <div style="padding: 15px; background: var(--bg-card); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                <h3 style="margin:0; color:var(--primary);">🗺️ الخريطة المباشرة (Dynmap)</h3>
-                <div>
-                    <button class="btn btn-blue" onclick="document.getElementById('map-frame').src = '/map/';">🔄 تحديث</button>
-                    <a href="/map/" target="_blank" class="btn btn-green" style="text-decoration:none;">🌍 فتح بنافذة</a>
+            <!-- Console Tab -->
+            <div id="console" class="tab-pane">
+                <div class="console-container">
+                    <div class="console-header">
+                        <div class="console-title"><i class="fa-solid fa-terminal"></i> root@enterprise-server:~</div>
+                        <button class="btn-icon" style="width:28px; height:28px; font-size:12px;" onclick="toggleAutoScroll()" title="إيقاف/تشغيل التمرير التلقائي"><i class="fa-solid fa-lock-open" id="scroll-icon"></i></button>
+                    </div>
+                    <div class="console-output" id="console-box"></div>
+                    <div class="console-input-wrapper">
+                        <span class="console-prefix">/</span>
+                        <input type="text" id="cmd" class="console-input" placeholder="اكتب الأمر هنا (استخدم الأسهم للتنقل في التاريخ)..." autocomplete="off">
+                        <button class="btn btn-primary" style="padding: 8px 20px;" onclick="sendCmd()"><i class="fa-solid fa-paper-plane"></i></button>
+                    </div>
                 </div>
             </div>
-            <iframe id="map-frame" src="/map/" style="width: 100%; flex: 1; border: none; background: #000; min-height: 60vh;"></iframe>
-        </div>
-        <div id="players" class="tab-content">
-            <h3 style="margin-top:0; color:var(--primary);">👥 إدارة اللاعبين المتصلين</h3>
-            <div id="players-list"><p style="color: var(--text-muted);">جاري التحميل...</p></div>
-        </div>
-        <div id="mods" class="tab-content">
-            <h3 style="margin-top:0; color:var(--primary);">📦 مدير المودات (Fabric 1.20.4)</h3>
-            <div class="action-bar" style="background: var(--bg-input); padding: 20px; border-radius: 8px; border: 1px dashed #475569; align-items: center;">
-                <input type="file" id="mod-file" accept=".jar" style="color: white; flex: 1;">
-                <button class="btn btn-green" onclick="uploadMod()">⬆️ رفع المود للسيرفر</button>
+            <!-- Players Tab -->
+            <div id="players" class="tab-pane">
+                <div class="player-grid" id="players-list">
+                    <p style="color: var(--text-muted); grid-column: 1/-1; text-align: center; padding: 40px;">جاري التحميل...</p>
+                </div>
             </div>
-            <div id="mods-list" style="margin-top: 20px; overflow-y: auto; flex: 1;">جاري التحميل...</div>
-        </div>
-        <div id="files" class="tab-content">
-            <h3 style="margin-top:0; color:var(--primary);">📁 مدير ملفات النظام</h3>
-            <p style="color: var(--text-muted); font-size: 14px;">تصفح، اقرأ، واحذف ملفات الإعدادات والتقارير بأمان.</p>
-            <div id="files-list" style="overflow-y: auto; max-height: 40vh;">جاري التحميل...</div>
-            <div id="file-viewer" class="file-viewer"></div>
-        </div>
-        <div id="backups" class="tab-content">
-            <h3 style="margin-top:0; color:var(--primary);">💾 نظام النسخ الاحتياطي (Disaster Recovery)</h3>
-            <button class="btn btn-blue" onclick="createBackup()" style="width: 100%; justify-content: center; padding: 15px; font-size: 16px; margin-bottom: 20px;">
-                📦 إنشاء نسخة احتياطية للعالم الآن
-            </button>
-            <div id="backups-list" style="overflow-y: auto; flex: 1;">جاري التحميل...</div>
-        </div>
-        <div id="settings" class="tab-content">
-            <h3 style="margin-top:0; color:var(--primary);">⚙️ إعدادات السيرفر الشاملة (server.properties)</h3>
-            <p style="color: var(--warning); font-size: 14px; margin-bottom: 20px;">⚠️ يجب إيقاف السيرفر وتشغيله مرة أخرى لتطبيق أي تعديلات.</p>
-            <div id="config-form" class="config-grid">جاري التحميل...</div>
-            <button class="btn btn-green" onclick="saveConfig()" style="width: 100%; justify-content: center; padding: 15px; font-size: 18px; margin-top: 20px; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);">
-                💾 حفظ جميع الإعدادات
-            </button>
-        </div>
-        <div id="crashes" class="tab-content">
-            <h3 style="margin-top:0; color:var(--danger);">⚠️ محلل تقارير الكراش (Crash Analyzer)</h3>
-            <div class="console-wrapper" style="flex: 1;">
-                <div class="console-output" id="crash-box" style="color: #fca5a5;">جاري التحميل...</div>
+            <!-- Mods Tab -->
+            <div id="mods" class="tab-pane">
+                <div class="drop-zone" id="drop-zone" onclick="document.getElementById('mod-file').click()">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    <h3 style="margin-bottom: 8px;">اسحب وأفلت المودات هنا</h3>
+                    <p>أو اضغط لاختيار ملف (.jar)</p>
+                    <input type="file" id="mod-file" accept=".jar" style="display: none;" onchange="handleFileUpload(this.files)">
+                </div>
+                <div class="data-list" id="mods-list">جاري التحميل...</div>
+            </div>
+            <!-- Files Tab -->
+            <div id="files" class="tab-pane">
+                <div class="data-list" id="files-list" style="max-height: 40vh; overflow-y: auto;">جاري التحميل...</div>
+                <div class="file-viewer-container" id="file-viewer-container">
+                    <div class="file-viewer-header">
+                        <span style="font-family: 'Fira Code'; font-weight: bold;" id="viewer-title">file.txt</span>
+                        <button class="btn-icon" style="width:28px; height:28px;" onclick="document.getElementById('file-viewer-container').style.display='none'"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <div class="file-viewer-content" id="file-viewer"></div>
+                </div>
+            </div>
+            <!-- Backups Tab -->
+            <div id="backups" class="tab-pane">
+                <button class="btn btn-primary" onclick="createBackup()" style="width: 100%; justify-content: center; padding: 16px; font-size: 18px; margin-bottom: 24px;">
+                    <i class="fa-solid fa-box-archive"></i> إنشاء نسخة احتياطية الآن
+                </button>
+                <div class="data-list" id="backups-list">جاري التحميل...</div>
+            </div>
+            <!-- Settings Tab -->
+            <div id="settings" class="tab-pane">
+                <div class="settings-grid" id="config-form">جاري التحميل...</div>
+                <button class="btn btn-success" onclick="saveConfig()" style="width: 100%; justify-content: center; padding: 16px; font-size: 18px; margin-top: 24px;">
+                    <i class="fa-solid fa-floppy-disk"></i> حفظ الإعدادات (يتطلب إعادة تشغيل)
+                </button>
+            </div>
+            <!-- Livemap Tab -->
+            <div id="livemap" class="tab-pane" style="height: 75vh;">
+                <iframe id="map-frame" src="/map/" style="width: 100%; height: 100%; border: 1px solid var(--border); border-radius: var(--radius-lg); background: #000;"></iframe>
             </div>
         </div>
     </div>
     <script>
+        // --- UI Utilities ---
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
-            toast.className = 'toast';
-            toast.style.borderRightColor = type === 'success' ? 'var(--success)' : (type === 'error' ? 'var(--danger)' : 'var(--primary)');
-            toast.innerHTML = `<span>${type === 'success' ? '✅' : (type === 'error' ? '❌' : 'ℹ️')}</span> ${message}`;
+            toast.className = `toast toast-${type}`;
+            const icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-info');
+            toast.innerHTML = `
+                <i class="fa-solid ${icon} toast-icon"></i>
+                <span style="font-weight: 600;">${message}</span>
+                <div class="toast-progress"></div>
+            `;
             container.appendChild(toast);
             setTimeout(() => {
-                toast.style.animation = 'fadeOut 0.3s ease-out forwards';
-                setTimeout(() => toast.remove(), 300);
+                toast.style.animation = 'slideRight 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) reverse forwards';
+                setTimeout(() => toast.remove(), 400);
             }, 4000);
         }
+        let modalCallback = null;
+        function confirmAction(title, desc, callback) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-desc').innerText = desc;
+            document.getElementById('modal-icon').innerText = title.includes('إجباري') || title.includes('فرمتة') ? '💀' : '⚠️';
+            document.getElementById('custom-modal').classList.add('active');
+            modalCallback = callback;
+        }
+        function closeModal() {
+            document.getElementById('custom-modal').classList.remove('active');
+            modalCallback = null;
+        }
+        document.getElementById('modal-confirm').addEventListener('click', () => {
+            if(modalCallback) modalCallback();
+            closeModal();
+        });
         function copyIP() {
             const ipText = document.getElementById('ip-display').innerText;
-            navigator.clipboard.writeText(ipText).then(() => showToast('تم نسخ الآي بي بنجاح!'));
+            navigator.clipboard.writeText(ipText).then(() => showToast('تم نسخ الآي بي بنجاح!', 'success'));
         }
-        let autoScroll = true;
-        let consoleBox = document.getElementById('console-box');
-        consoleBox.addEventListener('scroll', () => {
-            autoScroll = (consoleBox.scrollHeight - consoleBox.scrollTop - consoleBox.clientHeight < 50);
-        });
         function openTab(tabName, btnElement) {
-            document.querySelectorAll('.tab-content').forEach(t => {
-                t.classList.remove('active');
-                t.style.display = 'none';
-            });
+            document.querySelectorAll('.tab-pane').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(t => t.classList.remove('active'));
-            const targetTab = document.getElementById(tabName);
-            targetTab.classList.add('active');
-            targetTab.style.display = tabName === 'livemap' ? 'flex' : 'block';
+            document.getElementById(tabName).classList.add('active');
             if(btnElement) btnElement.classList.add('active');
         }
-        const chartOptions = {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false }, tooltip: { enabled: false } },
-            scales: { x: { display: false }, y: { display: false, min: 0, max: 100 } },
-            elements: { point: { radius: 0 }, line: { tension: 0.4, borderWidth: 2 } }
-        };
-        const cpuCtx = document.getElementById('cpuChart').getContext('2d');
-        const cpuChart = new Chart(cpuCtx, {
-            type: 'line',
-            data: { labels: Array(20).fill(''), datasets: [{ data: Array(20).fill(0), borderColor: '#0ea5e9', backgroundColor: 'rgba(14, 165, 233, 0.1)', fill: true }] },
-            options: chartOptions
-        });
-        const ramCtx = document.getElementById('ramChart').getContext('2d');
-        const ramChart = new Chart(ramCtx, {
-            type: 'line',
-            data: { labels: Array(20).fill(''), datasets: [{ data: Array(20).fill(0), borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true }] },
-            options: chartOptions
-        });
+        // --- Charts ---
+        const chartOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, scales: { x: { display: false }, y: { display: false, min: 0, max: 100 } }, elements: { point: { radius: 0 }, line: { tension: 0.4, borderWidth: 2 } } };
+        const cpuChart = new Chart(document.getElementById('cpuChart').getContext('2d'), { type: 'line', data: { labels: Array(20).fill(''), datasets: [{ data: Array(20).fill(0), borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true }] }, options: chartOptions });
+        const ramChart = new Chart(document.getElementById('ramChart').getContext('2d'), { type: 'line', data: { labels: Array(20).fill(''), datasets: [{ data: Array(20).fill(0), borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true }] }, options: chartOptions });
         function updateCharts(cpu, ram) {
-            cpuChart.data.datasets[0].data.push(cpu);
-            cpuChart.data.datasets[0].data.shift();
-            cpuChart.update('none');
-            ramChart.data.datasets[0].data.push(ram);
-            ramChart.data.datasets[0].data.shift();
-            ramChart.update('none');
+            cpuChart.data.datasets[0].data.push(cpu); cpuChart.data.datasets[0].data.shift(); cpuChart.update('none');
+            ramChart.data.datasets[0].data.push(ram); ramChart.data.datasets[0].data.shift(); ramChart.update('none');
+        }
+        // --- Console Logic ---
+        let autoScroll = true;
+        const consoleBox = document.getElementById('console-box');
+        const cmdInput = document.getElementById('cmd');
+        let cmdHistory = [];
+        let historyIndex = -1;
+        consoleBox.addEventListener('scroll', () => {
+            autoScroll = (consoleBox.scrollHeight - consoleBox.scrollTop - consoleBox.clientHeight < 50);
+            document.getElementById('scroll-icon').className = autoScroll ? "fa-solid fa-lock-open" : "fa-solid fa-lock";
+        });
+        function toggleAutoScroll() {
+            autoScroll = !autoScroll;
+            document.getElementById('scroll-icon').className = autoScroll ? "fa-solid fa-lock-open" : "fa-solid fa-lock";
+            if(autoScroll) consoleBox.scrollTop = consoleBox.scrollHeight;
+        }
+        cmdInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') sendCmd();
+            else if (e.key === 'ArrowUp') {
+                if (cmdHistory.length > 0 && historyIndex < cmdHistory.length - 1) {
+                    historyIndex++;
+                    cmdInput.value = cmdHistory[cmdHistory.length - 1 - historyIndex];
+                }
+                e.preventDefault();
+            } else if (e.key === 'ArrowDown') {
+                if (historyIndex > 0) {
+                    historyIndex--;
+                    cmdInput.value = cmdHistory[cmdHistory.length - 1 - historyIndex];
+                } else if (historyIndex === 0) {
+                    historyIndex = -1;
+                    cmdInput.value = '';
+                }
+                e.preventDefault();
+            }
+        });
+        function sendCmd() {
+            let cmd = cmdInput.value.trim();
+            if(cmd === "") return;
+            if(cmdHistory[cmdHistory.length-1] !== cmd) cmdHistory.push(cmd);
+            historyIndex = -1;
+            execCmd(cmd);
+            cmdInput.value = '';
+            autoScroll = true;
+        }
+        // --- API Calls ---
+        function execCmd(cmd) {
+            fetch('/api/command', { method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: 'cmd=' + encodeURIComponent(cmd) });
+        }
+        function sendAction(act) {
+            if(act === 'stop') showToast('تم إرسال أمر الإيقاف الآمن...', 'info');
+            if(act === 'start') showToast('جاري تشغيل السيرفر...', 'info');
+            fetch('/api/action', { method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: 'action=' + act });
         }
         function updateStatus() {
             fetch('/api/status').then(res => {
@@ -876,26 +1046,34 @@ DASHBOARD_HTML = """
                 document.getElementById('cpu-text').innerText = data.cpu + '%';
                 document.getElementById('ram-text').innerText = data.ram + '%';
                 updateCharts(data.cpu, data.ram);
+
                 let statusEl = document.getElementById('status-text');
                 statusEl.innerText = data.status;
-                statusEl.className = data.status.includes('شغال') ? 'stat-value status-online' : 'stat-value status-offline';
-                document.getElementById('players-count').innerText = data.players.length;
+                statusEl.style.color = data.status.includes('شغال') ? 'var(--success)' : 'var(--danger)';
+
+                document.getElementById('players-count').innerHTML = `${data.players.length}<span style="font-size:16px; color:var(--text-muted)">/20</span>`;
+
                 let ipDisplay = document.getElementById('ip-display');
+                let netDot = document.getElementById('net-dot');
                 ipDisplay.innerText = data.network.ip;
-                if(data.network.status === 'error') ipDisplay.className = 'ip-badge ip-error';
-                else ipDisplay.className = 'ip-badge ip-connected';
+                if(data.network.status === 'error') { netDot.className = 'status-dot'; ipDisplay.style.color = 'var(--danger)'; }
+                else { netDot.className = 'status-dot online'; ipDisplay.style.color = 'var(--text-main)'; }
+
                 consoleBox.innerHTML = data.logs.join('<br>');
                 if (autoScroll) consoleBox.scrollTop = consoleBox.scrollHeight;
-                let p_html = data.players.length === 0 ? '<p style="color: var(--text-muted); text-align:center; padding: 20px;">لا يوجد لاعبين متصلين حالياً.</p>' : '';
+
+                // Render Players Grid
+                let p_html = data.players.length === 0 ? '<p style="color: var(--text-muted); grid-column: 1/-1; text-align: center; padding: 40px;">لا يوجد لاعبين متصلين حالياً.</p>' : '';
                 data.players.forEach(p => {
                     p_html += `
-                    <div class="list-item">
-                        <div class="list-item-title">👤 ${p}</div>
-                        <div class="list-actions">
-                            <button class="btn btn-blue" onclick="execCmd('op ${p}')">👑 أدمن</button>
-                            <button class="btn btn-green" onclick="execCmd('gamemode creative ${p}')">✨ إبداع</button>
-                            <button class="btn btn-orange" onclick="execCmd('gamemode survival ${p}')">❤️ نجاة</button>
-                            <button class="btn btn-red" onclick="execCmd('kick ${p}')">👢 طرد</button>
+                    <div class="player-card">
+                        <img src="https://minotar.net/helm/${p}/100.png" class="player-head" alt="${p}" onerror="this.src='https://minotar.net/helm/MHF_Steve/100.png'">
+                        <div class="player-name">${p}</div>
+                        <div class="player-actions">
+                            <button class="btn btn-outline" onclick="execCmd('op ${p}')" title="إعطاء أدمن"><i class="fa-solid fa-crown" style="color:var(--warning)"></i></button>
+                            <button class="btn btn-outline" onclick="execCmd('gamemode creative ${p}')" title="كريتف"><i class="fa-solid fa-cube" style="color:var(--info)"></i></button>
+                            <button class="btn btn-outline" onclick="execCmd('gamemode survival ${p}')" title="سرفايفل"><i class="fa-solid fa-heart" style="color:var(--danger)"></i></button>
+                            <button class="btn btn-outline" onclick="confirmAction('طرد لاعب', 'هل تريد طرد ${p}؟', () => execCmd('kick ${p}'))" title="طرد"><i class="fa-solid fa-boot"></i></button>
                         </div>
                     </div>`;
                 });
@@ -903,69 +1081,67 @@ DASHBOARD_HTML = """
             }).catch(err => console.error("Status fetch error:", err));
         }
         setInterval(updateStatus, 2000);
-        function sendCmd() {
-            let cmd = document.getElementById('cmd').value;
-            if(cmd.trim() === "") return;
-            execCmd(cmd);
-            document.getElementById('cmd').value = '';
-            autoScroll = true;
-        }
-        function execCmd(cmd) {
-            fetch('/api/command', { method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: 'cmd=' + encodeURIComponent(cmd) });
-        }
-        function sendAction(act) {
-            if(act === 'kill' && !confirm('تحذير: الإيقاف الإجباري قد يؤدي إلى ضياع آخر التغييرات. متأكد؟')) return;
-            if(act === 'stop') showToast('🛑 تم إرسال أمر الإيقاف الآمن، يرجى الانتظار...', 'info');
-            if(act === 'start') showToast('🚀 جاري تشغيل السيرفر...', 'info');
-            fetch('/api/action', { method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: 'action=' + act });
+        // --- Mods Management ---
+        const dropZone = document.getElementById('drop-zone');
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); handleFileUpload(e.dataTransfer.files); });
+        function handleFileUpload(files) {
+            if(files.length === 0) return;
+            let file = files[0];
+            if(!file.name.endsWith('.jar')) return showToast('يجب أن يكون الملف بصيغة .jar', 'error');
+
+            let formData = new FormData();
+            formData.append("file", file);
+            showToast('جاري رفع المود...', 'info');
+
+            fetch('/api/mods', { method: 'POST', body: formData }).then(() => {
+                showToast('تم رفع المود بنجاح!', 'success');
+                loadMods();
+            }).catch(() => showToast('فشل الرفع!', 'error'));
         }
         function loadMods() {
             fetch('/api/mods').then(res => res.json()).then(mods => {
                 let html = mods.length === 0 ? '<p style="color: var(--text-muted); text-align:center; padding: 20px;">لا توجد مودات مثبتة.</p>' : '';
                 mods.forEach(mod => {
                     html += `
-                    <div class="list-item">
-                        <div class="list-item-title">🧩 ${mod}</div>
-                        <button class="btn btn-red" onclick="deleteMod('${mod}')">🗑️ حذف</button>
+                    <div class="data-item">
+                        <div class="data-info">
+                            <div class="data-icon"><i class="fa-brands fa-java"></i></div>
+                            <div>
+                                <div class="data-name">${mod.name}</div>
+                                <div class="data-meta">${mod.size} MB</div>
+                            </div>
+                        </div>
+                        <button class="btn btn-outline" style="color:var(--danger); border-color:var(--danger);" onclick="confirmAction('حذف مود', 'هل تريد حذف ${mod.name}؟', () => deleteMod('${mod.name}'))"><i class="fa-solid fa-trash"></i></button>
                     </div>`;
                 });
                 document.getElementById('mods-list').innerHTML = html;
             });
         }
-        function uploadMod() {
-            let fileInput = document.getElementById('mod-file');
-            if(fileInput.files.length === 0) return showToast('الرجاء اختيار ملف المود أولاً!', 'error');
-            let formData = new FormData();
-            formData.append("file", fileInput.files[0]);
-            let btn = event.target;
-            let originalText = btn.innerText;
-            btn.innerText = "⏳ جاري الرفع...";
-            btn.disabled = true;
-            fetch('/api/mods', { method: 'POST', body: formData }).then(() => {
-                showToast('تم رفع المود بنجاح!');
-                fileInput.value = '';
-                loadMods();
-                btn.innerText = originalText;
-                btn.disabled = false;
-            });
-        }
         function deleteMod(modName) {
-            if(!confirm('هل أنت متأكد من حذف المود: ' + modName + '؟')) return;
             fetch('/api/mods', { method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: 'delete=' + encodeURIComponent(modName) }).then(() => {
-                showToast('تم الحذف بنجاح!');
-                loadMods();
+                showToast('تم الحذف بنجاح!', 'success'); loadMods();
             });
         }
+        // --- Files Management ---
         function loadFiles() {
             fetch('/api/files').then(res => res.json()).then(files => {
                 let html = files.length === 0 ? '<p style="color: var(--text-muted); text-align:center; padding: 20px;">لا توجد ملفات.</p>' : '';
                 files.forEach(f => {
+                    let icon = f.name.endsWith('.json') ? 'fa-code' : (f.name.endsWith('.schem') ? 'fa-cubes' : 'fa-file-lines');
                     html += `
-                    <div class="list-item">
-                        <div class="list-item-title">📄 ${f}</div>
-                        <div class="list-actions">
-                            <button class="btn btn-blue" onclick="readFile('${f}')">👁️ عرض</button>
-                            <button class="btn btn-red" onclick="deleteFile('${f}')">🗑️ حذف</button>
+                    <div class="data-item">
+                        <div class="data-info">
+                            <div class="data-icon"><i class="fa-solid ${icon}"></i></div>
+                            <div>
+                                <div class="data-name">${f.name}</div>
+                                <div class="data-meta">${f.size} KB</div>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-outline" onclick="readFile('${f.name}')"><i class="fa-solid fa-eye"></i></button>
+                            <button class="btn btn-outline" style="color:var(--danger); border-color:var(--danger);" onclick="confirmAction('حذف ملف', 'هل تريد حذف ${f.name}؟', () => deleteFile('${f.name}'))"><i class="fa-solid fa-trash"></i></button>
                         </div>
                     </div>`;
                 });
@@ -973,35 +1149,37 @@ DASHBOARD_HTML = """
             });
         }
         function readFile(filename) {
-            let formData = new FormData();
-            formData.append('action', 'read');
-            formData.append('target', filename);
+            let formData = new FormData(); formData.append('action', 'read'); formData.append('target', filename);
             fetch('/api/files', { method: 'POST', body: formData }).then(res => res.text()).then(text => {
-                let viewer = document.getElementById('file-viewer');
-                viewer.style.display = 'block';
-                viewer.innerText = text;
-                viewer.scrollIntoView({behavior: "smooth"});
+                document.getElementById('viewer-title').innerText = filename;
+                document.getElementById('file-viewer').innerText = text;
+                document.getElementById('file-viewer-container').style.display = 'block';
+                document.getElementById('file-viewer-container').scrollIntoView({behavior: "smooth"});
             });
         }
         function deleteFile(filename) {
-            if(!confirm('هل أنت متأكد من حذف الملف: ' + filename + '؟')) return;
-            let formData = new FormData();
-            formData.append('action', 'delete');
-            formData.append('target', filename);
+            let formData = new FormData(); formData.append('action', 'delete'); formData.append('target', filename);
             fetch('/api/files', { method: 'POST', body: formData }).then(() => {
-                showToast('تم الحذف بنجاح!');
-                document.getElementById('file-viewer').style.display = 'none';
+                showToast('تم الحذف بنجاح!', 'success');
+                document.getElementById('file-viewer-container').style.display = 'none';
                 loadFiles();
             });
         }
+        // --- Backups ---
         function loadBackups() {
             fetch('/api/backup').then(res => res.json()).then(backups => {
                 let html = backups.length === 0 ? '<p style="color: var(--text-muted); text-align:center; padding: 20px;">لا توجد نسخ احتياطية.</p>' : '';
                 backups.forEach(b => {
                     html += `
-                    <div class="list-item">
-                        <div class="list-item-title">🗄️ ${b}</div>
-                        <a href="/api/backup/download/${b}" class="btn btn-green" style="text-decoration:none;">⬇️ تحميل للكمبيوتر</a>
+                    <div class="data-item">
+                        <div class="data-info">
+                            <div class="data-icon"><i class="fa-solid fa-file-zipper"></i></div>
+                            <div>
+                                <div class="data-name">${b.name}</div>
+                                <div class="data-meta">${b.size} MB</div>
+                            </div>
+                        </div>
+                        <a href="/api/backup/download/${b.name}" class="btn btn-outline" style="color:var(--success); border-color:var(--success); text-decoration:none;"><i class="fa-solid fa-download"></i> تحميل</a>
                     </div>`;
                 });
                 document.getElementById('backups-list').innerHTML = html;
@@ -1013,21 +1191,28 @@ DASHBOARD_HTML = """
                 setTimeout(loadBackups, 5000);
             });
         }
+        // --- Settings ---
         function loadConfig() {
             fetch('/api/config').then(res => res.json()).then(data => {
                 let html = '';
-                const schema = data.schema;
-                const values = data.values;
-                schema.forEach(f => {
-                    let val = values[f.key] !== undefined ? values[f.key] : f.default;
-                    html += `<div class="config-row"><span>${f.label} <small style="color:var(--text-muted); font-weight:normal;">(${f.key})</small></span>`;
-                    if(f.type === 'select') {
-                        html += `<select id="cfg-${f.key}" data-key="${f.key}">`;
+                data.schema.forEach(f => {
+                    let val = data.values[f.key] !== undefined ? data.values[f.key] : f.default;
+                    html += `<div class="setting-card">
+                                <div class="setting-info">
+                                    <h4>${f.label}</h4>
+                                    <p>${f.key}</p>
+                                </div>`;
+                    if(f.type === 'boolean') {
+                        let checked = val === 'true' ? 'checked' : '';
+                        html += `<label class="switch"><input type="checkbox" id="cfg-${f.key}" data-key="${f.key}" ${checked}><span class="slider"></span></label>`;
+                    } else if(f.type === 'select') {
+                        html += `<select class="custom-select" id="cfg-${f.key}" data-key="${f.key}">`;
                         f.options.forEach(opt => { html += `<option value="${opt}" ${val===opt?'selected':''}>${opt}</option>`; });
-                        html += `</select></div>`;
+                        html += `</select>`;
                     } else {
-                        html += `<input type="${f.type}" id="cfg-${f.key}" data-key="${f.key}" value="${val}"></div>`;
+                        html += `<input class="custom-input" type="${f.type}" id="cfg-${f.key}" data-key="${f.key}" value="${val}">`;
                     }
+                    html += `</div>`;
                 });
                 document.getElementById('config-form').innerHTML = html;
             });
@@ -1035,14 +1220,17 @@ DASHBOARD_HTML = """
         function saveConfig() {
             let data = {};
             document.querySelectorAll('#config-form input, #config-form select').forEach(el => {
-                if(el.value.trim() !== '') {
+                if(el.type === 'checkbox') {
+                    data[el.getAttribute('data-key')] = el.checked ? 'true' : 'false';
+                } else if(el.value.trim() !== '') {
                     data[el.getAttribute('data-key')] = el.value;
                 }
             });
             fetch('/api/config', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) }).then(() => {
-                showToast('تم حفظ جميع الإعدادات! أعد تشغيل السيرفر لتطبيقها.');
+                showToast('تم حفظ الإعدادات بنجاح!', 'success');
             });
         }
+        // --- Crash Reports ---
         function loadCrash() {
             fetch('/api/crash').then(res => res.text()).then(text => {
                 document.getElementById('crash-box').innerHTML = text;
