@@ -61,6 +61,13 @@ class BackupManager:
             backup_path = os.path.join(self.backup_dir, f"world_backup_{timestamp}")
             shutil.make_archive(backup_path, 'zip', self.world_dir)
             self.logger.log("Backup", f"✅ اكتملت النسخة الاحتياطية بنجاح: world_backup_{timestamp}.zip", is_safe=True)
+
+            # 🔥 نظام الحماية: الاحتفاظ بآخر 3 نسخ فقط ومسح الباقي تلقائياً 🔥
+            all_backups = sorted([f for f in os.listdir(self.backup_dir) if f.endswith('.zip')], reverse=True)
+            if len(all_backups) > 3:
+                for old_backup in all_backups[3:]:
+                    os.remove(os.path.join(self.backup_dir, old_backup))
+                self.logger.log("Backup", "🧹 تم تنظيف النسخ القديمة تلقائياً للحفاظ على مساحة البوكت.", is_safe=True)
         except Exception as e:
             self.logger.log("Backup", f"❌ فشل النسخ الاحتياطي: {html.escape(str(e))}", is_safe=True)
         finally:
