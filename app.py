@@ -3,8 +3,8 @@
 👑 ULTIMATE MINECRAFT SERVER PANEL - MODULAR ENTERPRISE EDITION 👑
 =========================================================================================
 Author: Senior AI Architect
-Version: 14.1.0 (Modular Architecture + God-Tier UI + Quick Sync)
-Description: Clean app.py acting as the API and Frontend router with new Quick Actions.
+Version: 14.2.0 (Auto-Prune Backups + Clear Backups Magic Command)
+Description: Clean app.py acting as the API and Frontend router with storage optimization.
 =========================================================================================
 """
 import os
@@ -61,12 +61,13 @@ class BackupManager:
             backup_path = os.path.join(self.backup_dir, f"world_backup_{timestamp}")
             shutil.make_archive(backup_path, 'zip', self.world_dir)
             self.logger.log("Backup", f"✅ اكتملت النسخة الاحتياطية بنجاح: world_backup_{timestamp}.zip", is_safe=True)
-
-            # 🔥 نظام الحماية: الاحتفاظ بآخر 3 نسخ فقط ومسح الباقي تلقائياً 🔥
+            # 🔥 نظام الحماية: الاحتفاظ بآخر 3 نسخ فقط ومسح الأقدم تلقائياً 🔥
             all_backups = sorted([f for f in os.listdir(self.backup_dir) if f.endswith('.zip')], reverse=True)
             if len(all_backups) > 3:
                 for old_backup in all_backups[3:]:
-                    os.remove(os.path.join(self.backup_dir, old_backup))
+                    try:
+                        os.remove(os.path.join(self.backup_dir, old_backup))
+                    except: pass
                 self.logger.log("Backup", "🧹 تم تنظيف النسخ القديمة تلقائياً للحفاظ على مساحة البوكت.", is_safe=True)
         except Exception as e:
             self.logger.log("Backup", f"❌ فشل النسخ الاحتياطي: {html.escape(str(e))}", is_safe=True)
@@ -134,10 +135,8 @@ def map_proxy(subpath=''):
     req_path = request.path
     if req_path.startswith('/map/'): req_path = req_path.replace('/map/', '/', 1)
     elif req_path == '/map': req_path = '/'
-
     target_url = f"http://127.0.0.1:8123{req_path}"
     if request.query_string: target_url += f"?{request.query_string.decode('utf-8')}"
-
     try:
         req = requests.get(target_url, stream=True, timeout=15)
         excluded_headers = ['content-encoding', 'content-length', 'transfer-encoding', 'connection']
@@ -168,16 +167,22 @@ def action():
 def send_command():
     cmd = request.form.get('cmd')
     if not cmd: return "Bad Request", 400
-    # --- الأمر السحري الجديد للمزامنة ---
+
+    # --- الأوامر السحرية الخاصة بإدارة النظام والبوكت ---
     if cmd.strip() == "!sync":
         logger_mgr.log("النظام", "🔄 جاري سحب الملفات الجديدة من الموقع إلى السيرفر...", is_safe=True)
         storage_mgr.hydrate_to_ram()
         logger_mgr.log("النظام", "✅ تم مزامنة الملفات بنجاح! يمكنك استخدامها الآن.", is_safe=True)
         return "OK"
+
     if cmd.strip() == "!resetworld":
         if mc_server.is_running():
             logger_mgr.log("النظام", "❌ لا يمكنك فرمتة العالم والسيرفر يعمل! قم بإيقاف السيرفر أولاً.", is_safe=True)
             return "OK"
+        shutil.rmtree(os.path.join(DATA_DIR, "world"), ignore_errors=True)
+        logger_mgr.log("النظام", "💥 تم فرمتة العالم القديم بنجاح! شغل السيرفر لتوليد عالم جديد.", is_safe=True)
+        return "OK"
+    # 🔥 أمر مسح جميع النسخ الاحتياطية لتفريغ البوكت فوراً 🔥
     if cmd.strip() == "!clearbackups":
         backup_dir = os.path.join(DATA_DIR, "backups")
         if os.path.exists(backup_dir):
@@ -193,12 +198,9 @@ def send_command():
                 except Exception as e:
                     pass
             freed_gb = round(freed_size_mb / 1024, 2)
-            logger_mgr.log("النظام", f"🧹 تم مسح {deleted_count} نسخة احتياطية وتفريغ {freed_gb} GB من البوكت بنجاح!", is_safe=True)
+            logger_mgr.log("النظام", f"🧹 تم مسح {deleted_count} نسخة احتياطية وتفريغ {freed_gb} GB من مساحة البوكت بنجاح!", is_safe=True)
         else:
-            logger_mgr.log("النظام", "⚠️ مجلد النسخ الاحتياطية فارغ أصلاً.", is_safe=True)
-        return "OK"
-        shutil.rmtree(os.path.join(DATA_DIR, "world"), ignore_errors=True)
-        logger_mgr.log("النظام", "💥 تم فرمتة العالم القديم بنجاح! شغل السيرفر لتوليد عالم جديد.", is_safe=True)
+            logger_mgr.log("النظام", "⚠️ مجلد النسخ الاحتياطية فارغ بالفعل.", is_safe=True)
         return "OK"
     if cmd.strip().startswith("!installmod "):
         url = cmd.strip().split(" ", 1)[1]
@@ -276,7 +278,6 @@ def handle_config():
                     else: f.write(line)
                 for k, v in data.items(): f.write(f"{k}={v}\n")
         return "Saved"
-
     props = {}
     if os.path.exists(config_path):
         with open(config_path, 'r') as f:
@@ -294,7 +295,6 @@ def file_manager():
             target_path = security_mgr.sanitize_path(target, DATA_DIR)
         except PermissionError:
             return "Access Denied", 403
-
         if action == 'delete':
             try:
                 if os.path.isfile(target_path): os.remove(target_path)
