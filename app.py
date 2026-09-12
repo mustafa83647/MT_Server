@@ -171,6 +171,25 @@ def send_command():
         if mc_server.is_running():
             logger_mgr.log("النظام", "❌ لا يمكنك فرمتة العالم والسيرفر يعمل! قم بإيقاف السيرفر أولاً.", is_safe=True)
             return "OK"
+    if cmd.strip() == "!clearbackups":
+        backup_dir = os.path.join(DATA_DIR, "backups")
+        if os.path.exists(backup_dir):
+            deleted_count = 0
+            freed_size_mb = 0
+            for f in os.listdir(backup_dir):
+                file_path = os.path.join(backup_dir, f)
+                try:
+                    if os.path.isfile(file_path):
+                        freed_size_mb += os.path.getsize(file_path) / (1024 * 1024)
+                        os.remove(file_path)
+                        deleted_count += 1
+                except Exception as e:
+                    pass
+            freed_gb = round(freed_size_mb / 1024, 2)
+            logger_mgr.log("النظام", f"🧹 تم مسح {deleted_count} نسخة احتياطية وتفريغ {freed_gb} GB من البوكت بنجاح!", is_safe=True)
+        else:
+            logger_mgr.log("النظام", "⚠️ مجلد النسخ الاحتياطية فارغ أصلاً.", is_safe=True)
+        return "OK"
         shutil.rmtree(os.path.join(DATA_DIR, "world"), ignore_errors=True)
         logger_mgr.log("النظام", "💥 تم فرمتة العالم القديم بنجاح! شغل السيرفر لتوليد عالم جديد.", is_safe=True)
         return "OK"
